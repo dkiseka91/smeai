@@ -8,7 +8,7 @@ import {
 } from 'firebase/auth'
 import { auth, db, COLLECTIONS } from '@/lib/firebase'
 import { doc, getDoc, setDoc } from 'firebase/firestore'
-import type { UserProfile, SubscriptionTier } from '@/types'
+import type { UserProfile } from '@/types'
 
 const ADMIN_EMAILS = (import.meta.env.VITE_ADMIN_EMAILS ?? '').split(',').map((e: string) => e.trim()).filter(Boolean)
 
@@ -68,13 +68,10 @@ export function useAuth() {
     await signOut(auth)
   }
 
-  async function upgradeSubscription(tier: SubscriptionTier, expiryDate: string) {
-    if (!user) return
-    const ref = doc(db, COLLECTIONS.USERS, user.uid)
-    const update = { subscription: tier, subscribedAt: new Date().toISOString(), subscriptionExpiry: expiryDate }
-    await setDoc(ref, update, { merge: true })
-    setProfile(prev => prev ? { ...prev, ...update } : null)
-  }
+  // Subscription upgrades are performed exclusively by the IPN Cloud Function
+  // using the admin SDK, which bypasses Firestore security rules.
+  // The client profile is refreshed by onAuthStateChanged when the user
+  // navigates or the app re-mounts.
 
-  return { user, profile, loading, isAdmin, isPremium, login, register, logout, upgradeSubscription }
+  return { user, profile, loading, isAdmin, isPremium, login, register, logout }
 }

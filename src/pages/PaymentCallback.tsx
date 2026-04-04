@@ -1,15 +1,14 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { doc, updateDoc } from 'firebase/firestore'
-import { db, COLLECTIONS } from '@/lib/firebase'
-import { useAuth } from '@/hooks/useAuth'
 import { checkPesapalStatus } from '@/lib/pesapal'
 import { LoadingSpinner } from '@/components/shared/LoadingSpinner'
 
+// This page only displays the result of a payment.
+// All Firestore writes (order status, subscription upgrade) are handled
+// exclusively by the IPN webhook in Cloud Functions, which uses the admin SDK.
 export function PaymentCallback() {
   const [searchParams] = useSearchParams()
   const navigate = useNavigate()
-  const { upgradeSubscription } = useAuth()
   const [status, setStatus] = useState<'checking' | 'success' | 'failed'>('checking')
   const [message, setMessage] = useState('')
 
@@ -18,7 +17,6 @@ export function PaymentCallback() {
       const orderTrackingId = searchParams.get('OrderTrackingId')
       const merchantRef = searchParams.get('OrderMerchantReference')
       const type = searchParams.get('type')
-      const plan = searchParams.get('plan') as 'monthly' | 'annual' | null
 
       if (!orderTrackingId || !merchantRef) {
         setStatus('failed')
@@ -30,36 +28,23 @@ export function PaymentCallback() {
         const result = await checkPesapalStatus(orderTrackingId)
 
         if (result.status === 'COMPLETED') {
-          // Update order in Firestore
-          await updateDoc(doc(db, COLLECTIONS.ORDERS, merchantRef), {
-            status: 'paid',
-            pesapalTrackingId: orderTrackingId,
-            paidAt: new Date().toISOString(),
-          })
-
-          // If it was a subscription payment, upgrade the user
-          if (type === 'subscription' && plan) {
-            const months = plan === 'annual' ? 12 : 1
-            const expiry = new Date()
-            expiry.setMonth(expiry.getMonth() + months)
-            await upgradeSubscription('member', expiry.toISOString())
-          }
-
           setStatus('success')
-          setMessage(type === 'subscription' ? 'Your AElevate Premium membership is now active!' : 'Your order has been confirmed!')
+          setMessage(
+            type === 'subscription'
+              ? 'Your AElevate Premium membership is now active!'
+              : 'Your order has been confirmed! You will receive a follow-up shortly.'
+          )
         } else {
-          await updateDoc(doc(db, COLLECTIONS.ORDERS, merchantRef), { status: 'failed' })
           setStatus('failed')
           setMessage('Payment was not completed. Please try again.')
         }
-      } catch (err) {
-        console.error(err)
+      } catch {
         setStatus('failed')
         setMessage('Could not verify payment. Please contact support if you were charged.')
       }
     }
     verify()
-  }, [searchParams, upgradeSubscription])
+  }, [searchParams])
 
   if (status === 'checking') return <LoadingSpinner fullPage />
 

@@ -3,7 +3,7 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // ── Helper functions ──────────────────────────────────────────────────────
+    // ── Helpers ───────────────────────────────────────────────────────────────
 
     function isSignedIn() {
       return request.auth != null;
@@ -13,64 +13,93 @@ service cloud.firestore {
       return isSignedIn() && request.auth.uid == uid;
     }
 
+    // Admin: stored in a dedicated `admins` collection (set via Cloud Functions)
+    function isAdmin() {
+      return isSignedIn() &&
+        exists(/databases/$(database)/documents/admins/$(request.auth.uid));
+    }
+
+    // Premium: subscription field on user profile (written only by Cloud Functions)
     function isPremium() {
       return isSignedIn() &&
         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.subscription == 'member';
     }
 
-    // ── Public content (read) ─────────────────────────────────────────────────
+    // Prevent clients from touching protected fields
+    function noProtectedFieldChanges() {
+      return !('subscription' in request.resource.data.diff(resource.data).affectedKeys()) &&
+             !('isAdmin'      in request.resource.data.diff(resource.data).affectedKeys());
+    }
+
+    // ── Public content ────────────────────────────────────────────────────────
 
     match /articles/{id} {
-      allow read: if resource.data.published == true;
-      allow write: if false;  // admin SDK only
+      allow get:  if resource.data.published == true;
+      allow list: if resource.data.published == true;
+      allow read, write: if isAdmin();  // admins can read/write all states
     }
 
     match /opportunities/{id} {
-      allow read: if resource.data.published == true;
-      allow write: if false;
+      allow get:  if resource.data.published == true;
+      allow list: if resource.data.published == true;
+      allow read, write: if isAdmin();
     }
 
     match /products/{id} {
-      allow read: if resource.data.published == true;
-      allow write: if false;
+      allow get:  if resource.data.published == true;
+      allow list: if resource.data.published == true;
+      allow read, write: if isAdmin();
     }
 
     match /programmes/{id} {
-      allow read: if resource.data.published == true;
-      allow write: if false;
+      allow get:  if resource.data.published == true;
+      allow list: if resource.data.published == true;
+      allow read, write: if isAdmin();
     }
 
     match /toolbox/{id} {
-      allow read: if resource.data.published == true;
-      allow write: if false;
+      allow get:  if resource.data.published == true;
+      allow list: if resource.data.published == true;
+      allow read, write: if isAdmin();
     }
 
-    // ── Users — own profile only ──────────────────────────────────────────────
+    // ── Users ─────────────────────────────────────────────────────────────────
 
     match /users/{uid} {
-      allow read, write: if isOwner(uid);
+      allow read: if isOwner(uid) || isAdmin();
+      // Users can create their own profile and update non-protected fields only
+      allow create: if isOwner(uid);
+      allow update: if isOwner(uid) && noProtectedFieldChanges();
+      // subscription + isAdmin fields are set exclusively by Cloud Functions (admin SDK)
     }
 
-    // ── Orders — own orders only ──────────────────────────────────────────────
+    // ── Admins ────────────────────────────────────────────────────────────────
+
+    match /admins/{uid} {
+      allow read: if isSignedIn() && request.auth.uid == uid;
+      allow write: if false; // set only via Cloud Functions admin SDK
+    }
+
+    // ── Orders ────────────────────────────────────────────────────────────────
 
     match /orders/{id} {
-      // Allow a user to create their own order, read their own orders
       allow create: if isSignedIn() && request.resource.data.userId == request.auth.uid;
-      allow read: if isSignedIn() && resource.data.userId == request.auth.uid;
-      // Updates come from Cloud Functions (admin SDK, bypasses rules)
+      allow read:   if isSignedIn() && resource.data.userId == request.auth.uid;
+      allow read, write: if isAdmin();
+      // Status updates (paid/failed) come exclusively from Cloud Functions admin SDK
       allow update, delete: if false;
     }
 
-    // ── Team & Stories — public read ──────────────────────────────────────────
+    // ── Team & Stories ────────────────────────────────────────────────────────
 
     match /team/{id} {
       allow read: if true;
-      allow write: if false;
+      allow write: if isAdmin();
     }
 
     match /stories/{id} {
       allow read: if true;
-      allow write: if false;
+      allow write: if isAdmin();
     }
   }
 }
