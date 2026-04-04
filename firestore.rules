@@ -1,0 +1,76 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ── Helper functions ──────────────────────────────────────────────────────
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(uid) {
+      return isSignedIn() && request.auth.uid == uid;
+    }
+
+    function isPremium() {
+      return isSignedIn() &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.subscription == 'member';
+    }
+
+    // ── Public content (read) ─────────────────────────────────────────────────
+
+    match /articles/{id} {
+      allow read: if resource.data.published == true;
+      allow write: if false;  // admin SDK only
+    }
+
+    match /opportunities/{id} {
+      allow read: if resource.data.published == true;
+      allow write: if false;
+    }
+
+    match /products/{id} {
+      allow read: if resource.data.published == true;
+      allow write: if false;
+    }
+
+    match /programmes/{id} {
+      allow read: if resource.data.published == true;
+      allow write: if false;
+    }
+
+    match /toolbox/{id} {
+      allow read: if resource.data.published == true;
+      allow write: if false;
+    }
+
+    // ── Users — own profile only ──────────────────────────────────────────────
+
+    match /users/{uid} {
+      allow read, write: if isOwner(uid);
+    }
+
+    // ── Orders — own orders only ──────────────────────────────────────────────
+
+    match /orders/{id} {
+      // Allow a user to create their own order, read their own orders
+      allow create: if isSignedIn() && request.resource.data.userId == request.auth.uid;
+      allow read: if isSignedIn() && resource.data.userId == request.auth.uid;
+      // Updates come from Cloud Functions (admin SDK, bypasses rules)
+      allow update, delete: if false;
+    }
+
+    // ── Team & Stories — public read ──────────────────────────────────────────
+
+    match /team/{id} {
+      allow read: if true;
+      allow write: if false;
+    }
+
+    match /stories/{id} {
+      allow read: if true;
+      allow write: if false;
+    }
+  }
+}
