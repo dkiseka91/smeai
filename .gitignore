@@ -18,6 +18,9 @@ firestore-debug.log
 ui-debug.log
 .firebaserc
 
+# TypeScript build info
+*.tsbuildinfo
+
 # Misc
 .DS_Store
 *.local
