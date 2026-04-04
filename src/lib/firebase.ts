@@ -27,6 +27,17 @@ const firebaseConfig = {
   appId: import.meta.env.VITE_FIREBASE_APP_ID,
 }
 
+const missingKeys = Object.entries(firebaseConfig)
+  .filter(([, v]) => !v)
+  .map(([k]) => k)
+
+if (missingKeys.length > 0) {
+  throw new Error(
+    `Firebase apiKey missing or invalid. Missing env vars: ${missingKeys.join(', ')}. ` +
+    `Create a .env file — see .env.example for the required keys.`
+  )
+}
+
 const app = initializeApp(firebaseConfig)
 
 export const auth = getAuth(app)
