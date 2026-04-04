@@ -47,10 +47,6 @@ export function Subscribe() {
         createdAt: serverTimestamp(),
       })
 
-      const months = selected === 'annual' ? 12 : 1
-      const expiry = new Date()
-      expiry.setMonth(expiry.getMonth() + months)
-
       const pesapalRes = await initiatePesapalPayment({
         amount: plan.priceUGX,
         currency: 'UGX',

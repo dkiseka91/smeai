@@ -1,9 +1,10 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '@/hooks/useAuth'
 import { db, COLLECTIONS } from '@/lib/firebase'
 import { addDoc, collection, serverTimestamp } from 'firebase/firestore'
 import { initiatePesapalPayment } from '@/lib/pesapal'
+import { AuthModal } from '@/components/shared/AuthModal'
 import type { CartItem } from '@/types'
 
 function formatUGX(n: number) {
@@ -22,23 +23,41 @@ export function Checkout({ items, total }: CheckoutProps) {
   const [form, setForm] = useState({ firstName: '', lastName: '', email: user?.email ?? '', phone: '' })
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const [authOpen, setAuthOpen] = useState(false)
 
-  if (items.length === 0) {
-    navigate('/shop')
-    return null
-  }
+  // Redirect to shop when cart is empty — useEffect avoids render-time navigation
+  useEffect(() => {
+    if (items.length === 0) navigate('/shop', { replace: true })
+  }, [items.length, navigate])
+
+  // Keep email in sync when user signs in
+  useEffect(() => {
+    if (user?.email) setForm(f => ({ ...f, email: user.email! }))
+  }, [user?.email])
+
+  if (items.length === 0) return null
 
   async function handleCheckout(e: React.FormEvent) {
     e.preventDefault()
+
+    if (!user) { setAuthOpen(true); return }
+    if (total <= 0) { setError('Invalid order total.'); return }
+
     setError('')
     setLoading(true)
     try {
       const orderDoc = await addDoc(
         collection(db, COLLECTIONS.ORDERS),
-        { userId: user?.uid ?? 'guest', userEmail: form.email, items, totalUGX: total, status: 'pending', createdAt: serverTimestamp() }
+        {
+          userId: user.uid,
+          userEmail: form.email,
+          items: items.map(i => ({ productId: i.product.id, name: i.product.name, price: i.product.price, quantity: i.quantity })),
+          totalUGX: total,
+          status: 'pending',
+          createdAt: serverTimestamp(),
+        }
       )
 
-      // Initiate Pesapal
       const pesapalRes = await initiatePesapalPayment({
         amount: total,
         currency: 'UGX',
@@ -51,11 +70,18 @@ export function Checkout({ items, total }: CheckoutProps) {
         reference: orderDoc.id,
       })
 
-      // Redirect to Pesapal
+      // Validate redirect URL is from Pesapal before following it
+      const redirectUrl = new URL(pesapalRes.redirectUrl)
+      if (!redirectUrl.hostname.endsWith('pesapal.com')) {
+        throw new Error('Unexpected payment redirect domain.')
+      }
+
       window.location.href = pesapalRes.redirectUrl
     } catch (err) {
-      console.error(err)
-      setError('Payment initiation failed. Please try again.')
+      const message = err instanceof Error ? err.message : 'Payment initiation failed.'
+      setError(message.includes('pesapal.com') || message.includes('Unexpected')
+        ? 'Payment initiation failed. Please try again.'
+        : message)
     } finally {
       setLoading(false)
     }
@@ -73,6 +99,11 @@ export function Checkout({ items, total }: CheckoutProps) {
             <h2 style={{ fontFamily: 'Syne', fontWeight: 700, fontSize: '1.1rem', color: '#1A2744', marginBottom: '1.25rem' }}>
               Your Details
             </h2>
+            {!user && (
+              <div style={{ background: '#fff7ed', border: '1px solid #fed7aa', borderRadius: 8, padding: '0.75rem', marginBottom: '1rem', fontFamily: 'DM Sans', fontSize: '0.85rem', color: '#9a3412' }}>
+                Please <button onClick={() => setAuthOpen(true)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#c2410c', fontWeight: 700, textDecoration: 'underline', padding: 0, fontFamily: 'inherit', fontSize: 'inherit' }}>log in</button> to complete your purchase.
+              </div>
+            )}
             <form onSubmit={handleCheckout} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
               {(['firstName', 'lastName', 'email', 'phone'] as const).map(field => (
                 <div key={field}>
@@ -138,6 +169,7 @@ export function Checkout({ items, total }: CheckoutProps) {
           </div>
         </div>
       </div>
+      {authOpen && <AuthModal onClose={() => setAuthOpen(false)} />}
     </div>
   )
 }
