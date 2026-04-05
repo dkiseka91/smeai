@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { Link } from 'react-router-dom'
 import { useOpportunities } from '@/hooks/useFirestore'
 import { LoadingSpinner } from '@/components/shared/LoadingSpinner'
 import { Search } from 'lucide-react'
@@ -156,8 +157,8 @@ export function Opportunities() {
           <p style={{ fontFamily: 'DM Sans', color: 'rgba(255,255,255,0.65)', marginBottom: '1.5rem', lineHeight: 1.7 }}>
             Subscribe to AElevate Premium and get instant alerts for new grants, scholarships, and exhibitions matched to your business.
           </p>
-          <a
-            href="/knowledge#subscribe"
+          <Link
+            to="/subscribe"
             style={{
               display: 'inline-block', background: '#F5A623', borderRadius: 10,
               padding: '0.875rem 1.75rem', fontFamily: 'Syne', fontWeight: 700,
@@ -165,7 +166,7 @@ export function Opportunities() {
             }}
           >
             Subscribe for Premium Alerts
-          </a>
+          </Link>
         </div>
       </section>
     </div>
