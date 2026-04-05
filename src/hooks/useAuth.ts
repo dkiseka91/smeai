@@ -20,26 +20,31 @@ export function useAuth() {
   useEffect(() => {
     return onAuthStateChanged(auth, async (u) => {
       setUser(u)
-      if (u) {
-        const ref = doc(db, COLLECTIONS.USERS, u.uid)
-        const snap = await getDoc(ref)
-        if (snap.exists()) {
-          setProfile(snap.data() as UserProfile)
-        } else {
-          // Create profile on first sign-in
-          const newProfile: UserProfile = {
-            uid: u.uid,
-            email: u.email ?? '',
-            displayName: u.displayName ?? '',
-            subscription: 'free',
+      try {
+        if (u) {
+          const ref = doc(db, COLLECTIONS.USERS, u.uid)
+          const snap = await getDoc(ref)
+          if (snap.exists()) {
+            setProfile(snap.data() as UserProfile)
+          } else {
+            const newProfile: UserProfile = {
+              uid: u.uid,
+              email: u.email ?? '',
+              displayName: u.displayName ?? '',
+              subscription: 'free',
+            }
+            await setDoc(ref, newProfile)
+            setProfile(newProfile)
           }
-          await setDoc(ref, newProfile)
-          setProfile(newProfile)
+        } else {
+          setProfile(null)
         }
-      } else {
+      } catch {
+        // Firestore unavailable or permissions error — continue as unauthenticated
         setProfile(null)
+      } finally {
+        setLoading(false)
       }
-      setLoading(false)
     })
   }, [])
 
