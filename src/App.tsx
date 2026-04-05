@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Routes, Route, Navigate } from 'react-router-dom'
+import { Routes, Route, Navigate, useNavigate } from 'react-router-dom'
 import { Header } from '@/components/layout/Header'
 import { Footer } from '@/components/layout/Footer'
 import { CartDrawer } from '@/components/layout/CartDrawer'
@@ -28,6 +28,7 @@ interface ToastState { message: string; type: 'success' | 'error' | 'info' }
 export default function App() {
   const { loading, isAdmin } = useAuth()
   const cart = useCart()
+  const navigate = useNavigate()
   const [cartOpen, setCartOpen] = useState(false)
   const [toast, setToast] = useState<ToastState | null>(null)
 
@@ -75,7 +76,7 @@ export default function App() {
           onClose={() => setCartOpen(false)}
           onRemove={cart.removeItem}
           onUpdateQty={cart.updateQuantity}
-          onCheckout={() => { setCartOpen(false); window.location.href = '/checkout' }}
+          onCheckout={() => { setCartOpen(false); navigate('/checkout') }}
         />
       )}
 

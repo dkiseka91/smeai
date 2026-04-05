@@ -13,71 +13,63 @@ service cloud.firestore {
       return isSignedIn() && request.auth.uid == uid;
     }
 
-    // Admin: stored in a dedicated `admins` collection (set via Cloud Functions)
+    // Admin: checked via the admins collection (populated via Firebase Console
+    // or the setAdminUser Cloud Function).
     function isAdmin() {
       return isSignedIn() &&
         exists(/databases/$(database)/documents/admins/$(request.auth.uid));
     }
 
-    // Premium: subscription field on user profile (written only by Cloud Functions)
-    function isPremium() {
-      return isSignedIn() &&
-        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.subscription == 'member';
-    }
-
-    // Prevent clients from touching protected fields
+    // Prevent clients from writing protected fields on their own profile
     function noProtectedFieldChanges() {
       return !('subscription' in request.resource.data.diff(resource.data).affectedKeys()) &&
              !('isAdmin'      in request.resource.data.diff(resource.data).affectedKeys());
     }
 
     // ── Public content ────────────────────────────────────────────────────────
+    // All content collections are publicly readable — the app filters by
+    // published==true at query time. Content is not sensitive.
+    // Writes require admin role (enforced server-side via admin SDK for seeding,
+    // and via isAdmin() for the admin panel).
 
     match /articles/{id} {
-      allow get:  if resource.data.published == true;
-      allow list: if resource.data.published == true;
-      allow read, write: if isAdmin();  // admins can read/write all states
+      allow read:  if true;
+      allow write: if isAdmin();
     }
 
     match /opportunities/{id} {
-      allow get:  if resource.data.published == true;
-      allow list: if resource.data.published == true;
-      allow read, write: if isAdmin();
+      allow read:  if true;
+      allow write: if isAdmin();
     }
 
     match /products/{id} {
-      allow get:  if resource.data.published == true;
-      allow list: if resource.data.published == true;
-      allow read, write: if isAdmin();
+      allow read:  if true;
+      allow write: if isAdmin();
     }
 
     match /programmes/{id} {
-      allow get:  if resource.data.published == true;
-      allow list: if resource.data.published == true;
-      allow read, write: if isAdmin();
+      allow read:  if true;
+      allow write: if isAdmin();
     }
 
     match /toolbox/{id} {
-      allow get:  if resource.data.published == true;
-      allow list: if resource.data.published == true;
-      allow read, write: if isAdmin();
+      allow read:  if true;
+      allow write: if isAdmin();
     }
 
     // ── Users ─────────────────────────────────────────────────────────────────
 
     match /users/{uid} {
-      allow read: if isOwner(uid) || isAdmin();
-      // Users can create their own profile and update non-protected fields only
+      allow read:   if isOwner(uid) || isAdmin();
       allow create: if isOwner(uid);
       allow update: if isOwner(uid) && noProtectedFieldChanges();
-      // subscription + isAdmin fields are set exclusively by Cloud Functions (admin SDK)
     }
 
     // ── Admins ────────────────────────────────────────────────────────────────
 
     match /admins/{uid} {
-      allow read: if isSignedIn() && request.auth.uid == uid;
-      allow write: if false; // set only via Cloud Functions admin SDK
+      allow read:  if isSignedIn() && request.auth.uid == uid;
+      allow write: if false; // set only via Firebase Console or admin SDK
     }
 
     // ── Orders ────────────────────────────────────────────────────────────────
@@ -86,19 +78,18 @@ service cloud.firestore {
       allow create: if isSignedIn() && request.resource.data.userId == request.auth.uid;
       allow read:   if isSignedIn() && resource.data.userId == request.auth.uid;
       allow read, write: if isAdmin();
-      // Status updates (paid/failed) come exclusively from Cloud Functions admin SDK
       allow update, delete: if false;
     }
 
     // ── Team & Stories ────────────────────────────────────────────────────────
 
     match /team/{id} {
-      allow read: if true;
+      allow read:  if true;
       allow write: if isAdmin();
     }
 
     match /stories/{id} {
-      allow read: if true;
+      allow read:  if true;
       allow write: if isAdmin();
     }
   }

@@ -1,4 +1,12 @@
+import { useEffect } from 'react'
+
 export function About() {
+  useEffect(() => {
+    if (window.location.href.includes('contact')) {
+      document.getElementById('contact')?.scrollIntoView({ behavior: 'smooth' })
+    }
+  }, [])
+
   return (
     <div>
       {/* Hero */}
