@@ -128,17 +128,55 @@ export function AdminDashboard() {
           ⚙ First-time Admin Setup
         </h2>
         <p style={{ fontFamily: 'DM Sans', fontSize: '0.85rem', color: '#78350f', lineHeight: 1.7, marginBottom: '1rem' }}>
-          The Seed Database button and Admin Panel writes require your user account to be registered
-          in the <code style={{ background: '#fef3c7', padding: '0.1rem 0.3rem', borderRadius: 3 }}>admins</code> Firestore collection.
-          Do this once in the Firebase Console:
+          Before you can seed or manage content, you must add your account to the{' '}
+          <code style={{ background: '#fef3c7', padding: '0.1rem 0.3rem', borderRadius: 3 }}>admins</code>{' '}
+          Firestore collection. This is a one-time setup that takes ~2 minutes:
         </p>
-        <ol style={{ fontFamily: 'DM Sans', fontSize: '0.85rem', color: '#78350f', lineHeight: 1.9, paddingLeft: '1.25rem', margin: 0 }}>
-          <li>Go to <strong>Firebase Console → Firestore → admins collection</strong></li>
-          <li>Click <strong>+ Add document</strong></li>
-          <li>Set Document ID to <strong>your Firebase Auth UID</strong> (find it in Authentication → Users)</li>
-          <li>Add a field: <code style={{ background: '#fef3c7', padding: '0.1rem 0.3rem', borderRadius: 3 }}>grantedAt</code> = <em>current timestamp</em></li>
-          <li>Save — then refresh this page and try Seed Database again</li>
+        <ol style={{ fontFamily: 'DM Sans', fontSize: '0.85rem', color: '#78350f', lineHeight: 2.1, paddingLeft: '1.25rem', margin: 0 }}>
+          <li>
+            <strong>Get your UID —</strong> open{' '}
+            <a
+              href="https://console.firebase.google.com/project/studio-6626017310-1eeea/authentication/users"
+              target="_blank" rel="noopener noreferrer"
+              style={{ color: '#b45309', fontWeight: 600 }}
+            >
+              Firebase Console → Authentication → Users
+            </a>
+            , click your email row, and copy the <strong>User UID</strong> string
+            (e.g. <code style={{ background: '#fef3c7', padding: '0.1rem 0.3rem', borderRadius: 3 }}>WxYz1234abcd…</code>)
+          </li>
+          <li>
+            <strong>Open Firestore —</strong>{' '}
+            <a
+              href="https://console.firebase.google.com/project/studio-6626017310-1eeea/firestore/data"
+              target="_blank" rel="noopener noreferrer"
+              style={{ color: '#b45309', fontWeight: 600 }}
+            >
+              Firebase Console → Firestore Database
+            </a>
+          </li>
+          <li>
+            <strong>Create the collection —</strong> click <strong>+ Start collection</strong>,
+            set Collection ID to <code style={{ background: '#fef3c7', padding: '0.1rem 0.3rem', borderRadius: 3 }}>admins</code>, then click <strong>Next</strong>
+          </li>
+          <li>
+            <strong>Add your document —</strong> in the Document ID field, <em>paste your UID from step 1</em>{' '}
+            (do <em>not</em> click Auto-ID)
+          </li>
+          <li>
+            <strong>Add a field —</strong> Field: <code style={{ background: '#fef3c7', padding: '0.1rem 0.3rem', borderRadius: 3 }}>grantedAt</code> ·
+            Type: <strong>string</strong> · Value: today's date, e.g.{' '}
+            <code style={{ background: '#fef3c7', padding: '0.1rem 0.3rem', borderRadius: 3 }}>2025-01-01</code>
+          </li>
+          <li>
+            Click <strong>Save</strong>, then come back here and click <strong>Seed Database</strong> again
+          </li>
         </ol>
+        <div style={{ marginTop: '1rem', padding: '0.65rem 0.85rem', background: '#fef3c7', borderRadius: 8, fontFamily: 'DM Sans', fontSize: '0.8rem', color: '#92400e' }}>
+          <strong>admins collection already exists?</strong> Skip step 3. Instead, click into the{' '}
+          <code style={{ background: '#fde68a', padding: '0.1rem 0.3rem', borderRadius: 3 }}>admins</code>{' '}
+          collection → <strong>+ Add document</strong> → follow steps 4–6.
+        </div>
       </div>
     </div>
   )
