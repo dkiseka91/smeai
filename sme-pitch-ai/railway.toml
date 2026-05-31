@@ -1,0 +1,20 @@
+[build]
+builder = "nixpacks"
+buildCommand = "pnpm install && pnpm --filter api build"
+startCommand = "pnpm --filter api start"
+
+[deploy]
+healthcheckPath = "/api/health"
+healthcheckTimeout = 30
+restartPolicyType = "on_failure"
+
+[[services]]
+name = "api"
+
+[[services]]
+name = "postgres"
+image = "postgres:16"
+
+[[services]]
+name = "redis"
+image = "redis:7-alpine"
