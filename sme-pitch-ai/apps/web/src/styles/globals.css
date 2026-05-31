@@ -1,0 +1,29 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --navy:      #1A2744;
+  --amber:     #F5A623;
+  --copper:    #C07940;
+  --white:     #FFFFFF;
+  --near-black:#1C1C1C;
+  --dark-grey: #404040;
+  --light-grey:#F2F2F2;
+  --steel-grey:#6B7A8D;
+  --success:   #16A34A;
+  --error:     #DC2626;
+  --warning:   #D97706;
+  --info:      #2563EB;
+}
+
+body {
+  font-family: 'Open Sans', sans-serif;
+  color: var(--near-black);
+  background: #FAFAFA;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  font-family: 'Montserrat', sans-serif;
+  font-weight: 700;
+}
