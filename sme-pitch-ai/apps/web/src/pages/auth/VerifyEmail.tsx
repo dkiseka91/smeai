@@ -5,7 +5,7 @@ import { useAuthStore } from '../../stores/authStore';
 
 export default function VerifyEmail() {
   const [params] = useSearchParams();
-  const [status, setStatus] = useState<'loading'|'success'|'error'>('loading');
+  const [status, setStatus] = useState<'loading' | 'success' | 'error'>('loading');
   const { setAuth } = useAuthStore();
   const navigate = useNavigate();
 
@@ -26,7 +26,7 @@ export default function VerifyEmail() {
       <div className="bg-white rounded-2xl shadow-xl p-8 max-w-md w-full text-center">
         {status === 'loading' && <p className="text-steel-grey">Verifying your email…</p>}
         {status === 'success' && <><h2 className="font-montserrat font-bold text-2xl text-navy mb-2">Email verified!</h2><p className="text-steel-grey text-sm">Redirecting to your dashboard…</p></>}
-        {status === 'error' && <><h2 className="font-montserrat font-bold text-2xl text-error mb-2">Verification failed</h2><p className="text-steel-grey text-sm">The link may be expired. <a href="/login" className="text-navy underline">Return to login</a></p></>}
+        {status === 'error'   && <><h2 className="font-montserrat font-bold text-2xl text-red-600 mb-2">Verification failed</h2><p className="text-steel-grey text-sm">The link may be expired. <a href="/login" className="text-navy underline">Return to login</a></p></>}
       </div>
     </div>
   );
