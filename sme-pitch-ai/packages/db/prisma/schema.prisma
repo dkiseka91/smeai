@@ -1,0 +1,254 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum PlanTier {
+  FREE
+  ENTREPRENEUR
+  GROWTH
+  CONSULTANT
+  INSTITUTION
+}
+
+enum WorkspaceMemberRole {
+  OWNER
+  ADMIN
+  EDITOR
+  VIEWER
+}
+
+enum BusinessStage {
+  IDEA
+  PRE_REVENUE
+  EARLY
+  GROWTH
+  SCALE
+}
+
+enum DocumentType {
+  BUSINESS_PLAN
+  PITCH_DECK
+  COVER_LETTER
+  PITCH_SCRIPT
+}
+
+enum DocumentStatus {
+  DRAFT
+  GENERATING
+  COMPLETE
+  ERROR
+}
+
+enum AudienceType {
+  BANK
+  INVESTOR
+  GRANT
+  ACCELERATOR
+  COMPETITION
+  GENERAL
+}
+
+enum ExportFormat {
+  DOCX
+  PDF
+  PPTX
+}
+
+enum FundingType {
+  LOAN
+  EQUITY
+  GRANT
+  MIXED
+}
+
+enum SubscriptionPlan {
+  ENTREPRENEUR
+  GROWTH
+  CONSULTANT
+  INSTITUTION
+}
+
+enum SubscriptionStatus {
+  ACTIVE
+  PAST_DUE
+  CANCELLED
+  INCOMPLETE
+}
+
+model User {
+  id                     String    @id @default(uuid())
+  email                  String    @unique
+  passwordHash           String?
+  name                   String
+  planTier               PlanTier  @default(FREE)
+  isEmailVerified        Boolean   @default(false)
+  emailVerificationToken String?
+  passwordResetToken     String?
+  passwordResetExpiry    DateTime?
+  stripeCustomerId       String?
+  googleId               String?   @unique
+  createdAt              DateTime  @default(now())
+  updatedAt              DateTime  @updatedAt
+
+  workspaces    WorkspaceMember[]
+  purchases     DocumentPurchase[]
+  affiliate     Affiliate?
+  ownedWorkspaces Workspace[]
+}
+
+model Workspace {
+  id                     String    @id @default(uuid())
+  name                   String
+  planTier               PlanTier  @default(FREE)
+  seatCount              Int       @default(1)
+  stripeSubscriptionId   String?
+  stripeCurrentPeriodEnd DateTime?
+  ownerId                String
+  createdAt              DateTime  @default(now())
+  updatedAt              DateTime  @updatedAt
+
+  owner        User              @relation(fields: [ownerId], references: [id])
+  members      WorkspaceMember[]
+  profiles     BusinessProfile[]
+  subscription Subscription?
+}
+
+model WorkspaceMember {
+  id          String              @id @default(uuid())
+  workspaceId String
+  userId      String
+  role        WorkspaceMemberRole @default(VIEWER)
+  createdAt   DateTime            @default(now())
+  updatedAt   DateTime            @updatedAt
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id])
+  user      User      @relation(fields: [userId], references: [id])
+
+  @@unique([workspaceId, userId])
+}
+
+model BusinessProfile {
+  id                String        @id @default(uuid())
+  workspaceId       String
+  name              String
+  industry          String
+  industryTemplate  String
+  stage             BusinessStage @default(IDEA)
+  country           String
+  currency          String        @default("USD")
+  onboardingData    Json          @default("{}")
+  isComplete        Boolean       @default(false)
+  deletedAt         DateTime?
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+
+  workspace       Workspace       @relation(fields: [workspaceId], references: [id])
+  documents       Document[]
+  financialModels FinancialModel[]
+  chatSessions    ChatSession[]
+}
+
+model Document {
+  id        String         @id @default(uuid())
+  profileId String
+  type      DocumentType
+  status    DocumentStatus @default(DRAFT)
+  audience  AudienceType   @default(GENERAL)
+  content   Json           @default("{}")
+  s3Key     String?
+  version   Int            @default(1)
+  wordCount Int?
+  deletedAt DateTime?
+  createdAt DateTime       @default(now())
+  updatedAt DateTime       @updatedAt
+
+  profile   BusinessProfile  @relation(fields: [profileId], references: [id])
+  exports   DocumentExport[]
+  purchases DocumentPurchase[]
+}
+
+model DocumentExport {
+  id            String       @id @default(uuid())
+  documentId    String
+  format        ExportFormat
+  s3Key         String
+  downloadCount Int          @default(0)
+  expiresAt     DateTime
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+
+  document Document @relation(fields: [documentId], references: [id])
+}
+
+model FinancialModel {
+  id            String   @id @default(uuid())
+  profileId     String
+  currency      String
+  revenueInputs Json     @default("{}")
+  costInputs    Json     @default("{}")
+  loanInputs    Json?
+  outputs       Json     @default("{}")
+  s3Key         String?
+  version       Int      @default(1)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  profile BusinessProfile @relation(fields: [profileId], references: [id])
+}
+
+model ChatSession {
+  id         String   @id @default(uuid())
+  profileId  String
+  messages   Json     @default("[]")
+  queryCount Int      @default(0)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  profile BusinessProfile @relation(fields: [profileId], references: [id])
+}
+
+model Subscription {
+  id                   String             @id @default(uuid())
+  workspaceId          String             @unique
+  stripeSubscriptionId String             @unique
+  plan                 SubscriptionPlan
+  status               SubscriptionStatus @default(ACTIVE)
+  currentPeriodEnd     DateTime
+  cancelAtPeriodEnd    Boolean            @default(false)
+  createdAt            DateTime           @default(now())
+  updatedAt            DateTime           @updatedAt
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id])
+}
+
+model DocumentPurchase {
+  id                   String   @id @default(uuid())
+  userId               String
+  documentId           String
+  stripePaymentIntentId String  @unique
+  amount               Int
+  currency             String
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  user     User     @relation(fields: [userId], references: [id])
+  document Document @relation(fields: [documentId], references: [id])
+}
+
+model Affiliate {
+  id                String  @id @default(uuid())
+  userId            String  @unique
+  referralCode      String  @unique
+  referredCount     Int     @default(0)
+  commissionBalance Decimal @default(0)
+  paidOut           Decimal @default(0)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id])
+}
