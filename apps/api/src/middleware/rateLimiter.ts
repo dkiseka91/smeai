@@ -6,6 +6,7 @@ async function checkRateLimit(
   limit: number,
   windowSeconds: number
 ): Promise<{ allowed: boolean; remaining: number }> {
+  if (!redis) return { allowed: true, remaining: limit };
   const now = Date.now();
   const windowStart = now - windowSeconds * 1000;
   const pipeline = redis.pipeline();
