@@ -89,7 +89,7 @@ router.post('/login', authRateLimiter, async (req, res, next) => {
     }
     const workspace = await prisma.workspace.findFirst({ where: { ownerId: user.id } });
     const tokens = signTokens(user.id, workspace?.id ?? '');
-    await redis.set(`refresh:${tokens.refreshToken}`, user.id, 'EX', 30 * 24 * 3600);
+    await redis?.set(`refresh:${tokens.refreshToken}`, user.id, 'EX', 30 * 24 * 3600);
     res.json({ ...tokens, user: { id: user.id, email: user.email, name: user.name, planTier: user.planTier } });
   } catch (err) { next(err); }
 });
@@ -97,16 +97,16 @@ router.post('/login', authRateLimiter, async (req, res, next) => {
 router.post('/refresh', async (req, res, next) => {
   try {
     const { refreshToken } = z.object({ refreshToken: z.string() }).parse(req.body);
-    const blacklisted = await redis.get(`blacklist:${refreshToken}`);
+    const blacklisted = await redis?.get(`blacklist:${refreshToken}`);
     if (blacklisted) {
       res.status(401).json({ error: { code: 'TOKEN_REVOKED', message: 'Token has been revoked' } });
       return;
     }
     const payload = jwt.verify(refreshToken, process.env.JWT_REFRESH_SECRET!) as { userId: string; workspaceId: string };
     const newTokens = signTokens(payload.userId, payload.workspaceId);
-    await redis.del(`refresh:${refreshToken}`);
-    await redis.set(`blacklist:${refreshToken}`, '1', 'EX', 30 * 24 * 3600);
-    await redis.set(`refresh:${newTokens.refreshToken}`, payload.userId, 'EX', 30 * 24 * 3600);
+    await redis?.del(`refresh:${refreshToken}`);
+    await redis?.set(`blacklist:${refreshToken}`, '1', 'EX', 30 * 24 * 3600);
+    await redis?.set(`refresh:${newTokens.refreshToken}`, payload.userId, 'EX', 30 * 24 * 3600);
     res.json(newTokens);
   } catch (err) { next(err); }
 });
@@ -114,7 +114,7 @@ router.post('/refresh', async (req, res, next) => {
 router.post('/logout', async (req, res, next) => {
   try {
     const { refreshToken } = z.object({ refreshToken: z.string() }).parse(req.body);
-    await redis.set(`blacklist:${refreshToken}`, '1', 'EX', 30 * 24 * 3600);
+    await redis?.set(`blacklist:${refreshToken}`, '1', 'EX', 30 * 24 * 3600);
     res.json({ message: 'Logged out' });
   } catch (err) { next(err); }
 });

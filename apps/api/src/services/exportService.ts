@@ -81,7 +81,7 @@ export async function generatePptx(content: Record<string, unknown>): Promise<Bu
       x: 0.4, y: 0.15, w: 9.2, h: 0.9,
       fontSize: 24, bold: true, color: 'FFFFFF', fontFace: 'Calibri',
     });
-    const points = (slide.bodyPoints ?? []).map(p => ({ text: p, options: { bullet: { color: AMBER }, color: '1C1C1C', fontSize: 16 } }));
+    const points = (slide.bodyPoints ?? []).map(p => ({ text: p, bullet: { color: AMBER }, color: '1C1C1C', fontSize: 16 }));
     if (points.length > 0) {
       s.addText(points, { x: 0.4, y: 1.5, w: 9.2, h: 5, valign: 'top', fontFace: 'Calibri' });
     }

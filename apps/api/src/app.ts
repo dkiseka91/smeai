@@ -26,8 +26,8 @@ app.get('/api/health', async (_req, res) => {
   const { redis } = await import('./lib/redis');
   try {
     await prisma.$queryRaw`SELECT 1`;
-    await redis.ping();
-    res.json({ status: 'ok', db: 'connected', redis: 'connected', timestamp: new Date().toISOString() });
+    const redisStatus = redis ? await redis.ping().then(() => 'connected').catch(() => 'error') : 'disabled';
+    res.json({ status: 'ok', db: 'connected', redis: redisStatus, timestamp: new Date().toISOString() });
   } catch {
     res.status(503).json({ status: 'error', timestamp: new Date().toISOString() });
   }
