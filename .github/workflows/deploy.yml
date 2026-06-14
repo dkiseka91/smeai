@@ -2,62 +2,41 @@ name: Deploy to GitHub Pages
 
 on:
   push:
-    branches: [main]
-  workflow_dispatch:
+    branches: [ main ]
 
 permissions:
   contents: read
   pages: write
   id-token: write
 
-concurrency:
-  group: pages
-  cancel-in-progress: true
-
-env:
-  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
-
 jobs:
-  build:
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v4
-
-      - name: Setup Node
+      - name: Set up Node
         uses: actions/setup-node@v4
         with:
-          node-version: 20
-          cache: pnpm
+          node-node: '20'
 
-      - name: Install dependencies
-        run: pnpm install --no-frozen-lockfile
-
-      - name: Build web app
+      - name: Install and Build Frontend
+        # Navigate to the web app folder, install dependencies, and build
+        run: |
+          npm install
+          npm run build
         working-directory: apps/web
-        env:
-          GITHUB_PAGES: 'true'
-          VITE_API_URL: ${{ secrets.VITE_API_URL }}
-        run: pnpm build
 
-      - name: Copy index.html to 404.html for SPA routing
-        run: cp apps/web/dist/index.html apps/web/dist/404.html
-
-      - name: Upload Pages artifact
+      - name: Upload Artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: apps/web/dist
+          # Target the dist folder inside the web app folder
+          path: 'apps/web/dist'
 
-  deploy:
-    needs: build
-    runs-on: ubuntu-latest
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-    steps:
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
