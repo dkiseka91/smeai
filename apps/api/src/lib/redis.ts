@@ -1,12 +1,16 @@
 import Redis from 'ioredis';
 
 if (!process.env.REDIS_URL) {
-  throw new Error('REDIS_URL environment variable is required');
+  console.warn('[Redis] REDIS_URL not set — rate-limiting and plan-guard will be disabled');
 }
 
-export const redis = new Redis(process.env.REDIS_URL, {
-  maxRetriesPerRequest: 3,
-  lazyConnect: true,
-});
+export const redis: Redis | null = process.env.REDIS_URL
+  ? new Redis(process.env.REDIS_URL, {
+      maxRetriesPerRequest: 1,
+      lazyConnect: true,
+      connectTimeout: 5000,
+      enableOfflineQueue: false,
+    })
+  : null;
 
-redis.on('error', (err) => console.error('[Redis] Error:', err));
+redis?.on('error', (err) => console.error('[Redis] Error:', err));

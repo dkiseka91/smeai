@@ -1,8 +1,12 @@
 import { Router } from 'express';
+import type { Prisma } from '@prisma/client';
 import { z } from 'zod';
 import { prisma } from '../lib/prisma';
 import { authMiddleware } from '../middleware/auth';
 import { OnboardingDataSchema } from '@sme-pitch-ai/shared';
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const toJson = (v: unknown): Prisma.InputJsonValue => v as any;
 
 const router = Router();
 router.use(authMiddleware);
@@ -28,7 +32,7 @@ router.post('/', async (req, res, next) => {
         stage: body.stage,
         country: body.country,
         currency: body.currency,
-        onboardingData: body.onboardingData ?? {},
+        onboardingData: toJson(body.onboardingData ?? {}),
       },
     });
     res.status(201).json(profile);
@@ -48,7 +52,7 @@ router.get('/', async (req, res, next) => {
 router.get('/:id', async (req, res, next) => {
   try {
     const profile = await prisma.businessProfile.findFirst({
-      where: { id: req.params.id, workspaceId: req.workspaceId!, deletedAt: null },
+      where: { id: req.params['id'] as string, workspaceId: req.workspaceId!, deletedAt: null },
       include: { documents: { where: { deletedAt: null } }, financialModels: true, chatSessions: true },
     });
     if (!profile) { res.status(404).json({ error: { code: 'NOT_FOUND', message: 'Profile not found' } }); return; }
@@ -66,15 +70,23 @@ router.put('/:id', async (req, res, next) => {
       currency: z.string().optional(),
     }).parse(req.body);
 
-    let isComplete = false;
+    let isComplete: boolean | undefined;
     if (body.onboardingData) {
       const result = OnboardingDataSchema.safeParse(body.onboardingData);
       isComplete = result.success;
     }
 
+    const updateData: Prisma.BusinessProfileUpdateInput = {};
+    if (body.name !== undefined) updateData.name = body.name;
+    if (body.stage !== undefined) updateData.stage = body.stage;
+    if (body.country !== undefined) updateData.country = body.country;
+    if (body.currency !== undefined) updateData.currency = body.currency;
+    if (body.onboardingData !== undefined) updateData.onboardingData = toJson(body.onboardingData);
+    if (isComplete !== undefined) updateData.isComplete = isComplete;
+
     const profile = await prisma.businessProfile.update({
-      where: { id: req.params.id },
-      data: { ...body, ...(body.onboardingData ? { isComplete } : {}) },
+      where: { id: req.params['id'] as string },
+      data: updateData,
     });
     res.json(profile);
   } catch (err) { next(err); }
@@ -83,7 +95,7 @@ router.put('/:id', async (req, res, next) => {
 router.delete('/:id', async (req, res, next) => {
   try {
     await prisma.businessProfile.update({
-      where: { id: req.params.id },
+      where: { id: req.params['id'] as string },
       data: { deletedAt: new Date() },
     });
     res.json({ message: 'Profile deleted' });

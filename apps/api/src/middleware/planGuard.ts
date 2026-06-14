@@ -14,6 +14,7 @@ export function planGuard(limitKey: LimitKey) {
     const limits = PLAN_LIMITS[planTier];
     const limit = limits[limitKey] as number;
     if (limit === -1) { next(); return; }
+    if (!redis) { next(); return; }
     const now = new Date();
     const monthKey = `usage:${req.user.id}:${limitKey}:${now.getFullYear()}-${now.getMonth() + 1}`;
     const current = await redis.incr(monthKey);

@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import type { Prisma } from '@prisma/client';
 import { z } from 'zod';
 import { prisma } from '../lib/prisma';
 import { authMiddleware } from '../middleware/auth';
@@ -24,7 +25,7 @@ router.post('/message', planGuard('chatQueries'), async (req, res, next) => {
       session = await prisma.chatSession.create({ data: { profileId, messages: [] } });
     }
 
-    const history = session.messages as ChatMessage[];
+    const history = session.messages as unknown as ChatMessage[];
     history.push({ role: 'user', content: message, timestamp: new Date().toISOString() });
 
     const onboardingData = OnboardingDataSchema.parse(profile.onboardingData);
@@ -42,7 +43,7 @@ router.post('/message', planGuard('chatQueries'), async (req, res, next) => {
     history.push({ role: 'assistant', content: fullResponse, timestamp: new Date().toISOString() });
     await prisma.chatSession.update({
       where: { id: session.id },
-      data: { messages: history as unknown as Record<string, unknown>[], queryCount: { increment: 1 } },
+      data: { messages: history as unknown as Prisma.InputJsonValue, queryCount: { increment: 1 } },
     });
 
     res.write(`data: ${JSON.stringify({ type: 'complete' })}\n\n`);
