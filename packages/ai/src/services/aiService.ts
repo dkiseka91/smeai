@@ -6,6 +6,7 @@ import { buildFinancialNarrativePrompt } from '../prompts/financialNarrative';
 import { buildCoverLetterPrompt } from '../prompts/coverLetter';
 import { buildPitchReviewPrompt } from '../prompts/pitchReview';
 import { buildChatSystemPrompt } from '../prompts/chat';
+import { buildBankLoanPrompt } from '../prompts/bankLoan';
 import type {
   OnboardingData,
   BusinessPlanContent,
@@ -139,6 +140,27 @@ export async function generateCoverLetter(
     const response = await anthropic.messages.create({
       model: MODEL,
       max_tokens: 1024,
+      system,
+      messages: [{ role: 'user', content: user }],
+    });
+    const block = response.content[0];
+    if (block.type !== 'text') throw new AIGenerationError('Unexpected response type', 'UNEXPECTED_RESPONSE');
+    return block.text;
+  });
+}
+
+export async function generateBankLoanApplication(
+  profile: OnboardingData,
+  bankName: string,
+  loanAmount: number,
+  purpose: string,
+  tenureMonths: number
+): Promise<string> {
+  const { system, user } = buildBankLoanPrompt(profile, bankName, loanAmount, purpose, tenureMonths);
+  return withRetry(async () => {
+    const response = await anthropic.messages.create({
+      model: MODEL,
+      max_tokens: 2048,
       system,
       messages: [{ role: 'user', content: user }],
     });

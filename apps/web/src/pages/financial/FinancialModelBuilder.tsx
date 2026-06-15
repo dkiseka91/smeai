@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { api } from '../../lib/api';
+import { api, getApiBase } from '../../lib/api';
+import { useAuthStore } from '../../stores/authStore';
 import { BarChart, Bar, LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Legend } from 'recharts';
 import { Download, Plus, Trash2, Calculator } from 'lucide-react';
 
@@ -19,7 +20,9 @@ export default function FinancialModelBuilder() {
   const [products, setProducts] = useState<ProductLine[]>([{ id: uid(), name: 'Product 1', price: 100, unitsPerMonth: 10, monthlyGrowthRate: 5 }]);
   const [fixedCosts, setFixedCosts] = useState<FixedCost[]>([{ id: uid(), name: 'Rent & Utilities', monthlyAmount: 1000 }]);
   const [outputs, setOutputs] = useState<FinancialOutputs | null>(null);
+  const [savedModelId, setSavedModelId] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [downloading, setDownloading] = useState(false);
 
   const { data: profile } = useQuery({
     queryKey: ['profile', profileId],
@@ -31,16 +34,51 @@ export default function FinancialModelBuilder() {
     setLoading(true);
     try {
       const { data } = await api.post('/financial/calculate', {
-        currency: 'USD',
+        currency: profile?.onboardingData?.currency ?? 'USD',
         startDate: new Date().toISOString().slice(0, 10),
         productLines: products,
         fixedCosts,
         variableCosts: [{ id: uid(), name: 'Variable Costs', type: 'PERCENT_OF_REVENUE', value: 20 }],
       });
       setOutputs(data as FinancialOutputs);
+      setSavedModelId(null);
       setTab('results');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const downloadXlsx = async () => {
+    if (!outputs || !profileId) return;
+    setDownloading(true);
+    try {
+      let modelId = savedModelId;
+      if (!modelId) {
+        const modelIdTemp = `fin_${Date.now()}`;
+        const { data } = await api.post(`/financial/${modelIdTemp}/save`, {
+          profileId,
+          inputs: { productLines: products, fixedCosts },
+          outputs,
+        });
+        modelId = data.id as string;
+        setSavedModelId(modelId);
+      }
+      const token = useAuthStore.getState().accessToken ?? '';
+      const resp = await fetch(`${getApiBase()}/exports/financial/${modelId}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!resp.ok) throw new Error('Export failed');
+      const blob = await resp.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'financial-model.xlsx';
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setDownloading(false);
     }
   };
 
@@ -53,11 +91,20 @@ export default function FinancialModelBuilder() {
           <h1 className="font-montserrat font-bold text-2xl text-navy">Financial Model</h1>
           <p className="text-steel-grey text-sm">{profile?.name}</p>
         </div>
-        <button onClick={calculate} disabled={loading}
-          className="flex items-center gap-2 bg-amber text-navy px-5 py-2.5 rounded-lg text-sm font-bold hover:bg-amber/90 disabled:opacity-50">
-          <Calculator size={16} className={loading ? 'animate-spin' : ''} />
-          {loading ? 'Calculating…' : 'Calculate'}
-        </button>
+        <div className="flex items-center gap-3">
+          {outputs && (
+            <button onClick={downloadXlsx} disabled={downloading}
+              className="flex items-center gap-2 bg-white border border-gray-200 text-navy px-4 py-2.5 rounded-lg text-sm font-semibold hover:bg-gray-50 disabled:opacity-50">
+              <Download size={16} className={downloading ? 'animate-spin' : ''} />
+              {downloading ? 'Exporting…' : 'Download XLSX'}
+            </button>
+          )}
+          <button onClick={calculate} disabled={loading}
+            className="flex items-center gap-2 bg-amber text-navy px-5 py-2.5 rounded-lg text-sm font-bold hover:bg-amber/90 disabled:opacity-50">
+            <Calculator size={16} className={loading ? 'animate-spin' : ''} />
+            {loading ? 'Calculating…' : 'Calculate'}
+          </button>
+        </div>
       </div>
 
       <div className="flex border-b border-gray-200 mb-6">

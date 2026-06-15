@@ -1,29 +1,99 @@
 import React, { useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { api } from '../../lib/api';
-import { Download, FileText, RefreshCw } from 'lucide-react';
+import { api, getApiBase } from '../../lib/api';
 import { useAuthStore } from '../../stores/authStore';
+import { Download, RefreshCw, CheckSquare, Square, FileText, Building2 } from 'lucide-react';
 
 interface Profile { id: string; name: string; isComplete: boolean; }
 
 const FUNDERS = [
   'Stanbic Bank Uganda', 'Centenary Bank', 'DFCU Bank', 'KCB Uganda', 'Equity Bank Uganda',
   'Uganda Development Bank', 'NSSF Uganda', 'African Development Bank', 'World Bank IFC',
-  'UNCDF', 'FSD Uganda', 'Mastercard Foundation', 'Other',
+  'Enterprise Uganda', 'PSFU Uganda', 'Mastercard Foundation', 'Other',
 ];
+
+const UGANDAN_BANKS = [
+  'Stanbic Bank Uganda', 'Centenary Bank', 'DFCU Bank', 'KCB Uganda', 'Equity Bank Uganda',
+  'Standard Chartered Uganda', 'Absa Bank Uganda', 'Housing Finance Bank', 'Cairo Bank Uganda',
+];
+
+const BASE_CHECKLIST = [
+  { id: 'reg', label: 'Business registration certificate (URSB)' },
+  { id: 'tin', label: 'Tax Identification Number (TIN) certificate' },
+  { id: 'id', label: 'Director / owner national ID or passport' },
+  { id: 'stmt', label: '6-month bank statements (certified)' },
+  { id: 'plan', label: 'Business plan (you can use your generated plan)' },
+  { id: 'fin', label: '3-year financial statements or projections' },
+  { id: 'photo', label: 'Passport-size photographs (2 per director)' },
+  { id: 'lease', label: 'Premises lease/tenancy agreement or land title' },
+  { id: 'ref', label: 'Two business references (suppliers or clients)' },
+];
+
+const BANK_EXTRA: Record<string, { id: string; label: string }[]> = {
+  'Stanbic Bank Uganda': [
+    { id: 'stanbic_collateral', label: 'Collateral valuation report (if using property)' },
+    { id: 'stanbic_cr12', label: 'Company CR12 search (URSB) — for limited companies' },
+  ],
+  'DFCU Bank': [
+    { id: 'dfcu_cashflow', label: 'Projected cash flow statement (24 months)' },
+    { id: 'dfcu_insurance', label: 'Insurance policy for collateral assets' },
+  ],
+  'Centenary Bank': [
+    { id: 'centy_group', label: 'Group guarantee forms (if applying as a group)' },
+    { id: 'centy_savings', label: 'Proof of savings account with Centenary Bank' },
+  ],
+  'KCB Uganda': [
+    { id: 'kcb_invoice', label: 'LPO or invoices (for invoice discounting)' },
+    { id: 'kcb_agri', label: 'Land title or crop assessment (for agri-loans)' },
+  ],
+  'Equity Bank Uganda': [
+    { id: 'eq_kyc', label: 'KYC form (completed and signed)' },
+    { id: 'eq_mobile', label: 'MTN/Airtel Mobile Money statement (6 months)' },
+  ],
+};
+
+type TabId = 'cover' | 'loan' | 'checklist';
+
+function storageKey(profileId: string | undefined) {
+  return `checklist:${profileId ?? 'default'}`;
+}
+
+function loadChecked(profileId: string | undefined): Set<string> {
+  try {
+    const raw = localStorage.getItem(storageKey(profileId));
+    if (raw) return new Set(JSON.parse(raw) as string[]);
+  } catch { /* ignore */ }
+  return new Set();
+}
 
 export default function LoanApplicationToolkit() {
   const { profileId } = useParams();
-  const { user } = useAuthStore();
+  const [tab, setTab] = useState<TabId>('cover');
+
+  // Cover letter state
   const [funderName, setFunderName] = useState('');
   const [customFunder, setCustomFunder] = useState('');
-  const [amount, setAmount] = useState('');
-  const [purpose, setPurpose] = useState('');
-  const [coverLetterContent, setCoverLetterContent] = useState('');
-  const [generating, setGenerating] = useState(false);
-  const [documentId, setDocumentId] = useState<string | null>(null);
-  const [error, setError] = useState('');
+  const [coverAmount, setCoverAmount] = useState('');
+  const [coverPurpose, setCoverPurpose] = useState('');
+  const [coverContent, setCoverContent] = useState('');
+  const [coverDocId, setCoverDocId] = useState<string | null>(null);
+  const [coverGenerating, setCoverGenerating] = useState(false);
+  const [coverError, setCoverError] = useState('');
+
+  // Bank loan writer state
+  const [bankName, setBankName] = useState('Stanbic Bank Uganda');
+  const [loanAmount, setLoanAmount] = useState('');
+  const [loanPurpose, setLoanPurpose] = useState('');
+  const [loanTenure, setLoanTenure] = useState('36');
+  const [loanContent, setLoanContent] = useState('');
+  const [loanDocId, setLoanDocId] = useState<string | null>(null);
+  const [loanGenerating, setLoanGenerating] = useState(false);
+  const [loanError, setLoanError] = useState('');
+
+  // Checklist state
+  const [checked, setChecked] = useState<Set<string>>(() => loadChecked(profileId));
+  const [checklistBank, setChecklistBank] = useState('Stanbic Bank Uganda');
 
   const { data: profile } = useQuery<Profile>({
     queryKey: ['profile', profileId],
@@ -33,145 +103,270 @@ export default function LoanApplicationToolkit() {
 
   const effectiveFunder = funderName === 'Other' ? customFunder : funderName;
 
-  const handleGenerate = async () => {
-    if (!effectiveFunder || !amount || !purpose) {
-      setError('Please fill in funder name, amount, and purpose.');
+  const toggleCheck = (id: string) => {
+    setChecked(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      localStorage.setItem(storageKey(profileId), JSON.stringify([...next]));
+      return next;
+    });
+  };
+
+  const handleCoverGenerate = async () => {
+    if (!effectiveFunder || !coverAmount || !coverPurpose) {
+      setCoverError('Please fill in funder, amount, and purpose.');
       return;
     }
-    setError('');
-    setGenerating(true);
-    setCoverLetterContent('');
-    setDocumentId(null);
+    setCoverError(''); setCoverGenerating(true); setCoverContent(''); setCoverDocId(null);
     try {
       const token = useAuthStore.getState().accessToken ?? '';
-      const resp = await fetch('/api/documents/cover-letter/generate', {
+      const resp = await fetch(`${getApiBase()}/documents/cover-letter/generate`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ profileId, funderName: effectiveFunder, amount: parseFloat(amount), purpose }),
+        body: JSON.stringify({ profileId, funderName: effectiveFunder, amount: parseFloat(coverAmount), purpose: coverPurpose }),
       });
       const data = await resp.json() as { content?: string; documentId?: string; error?: { message?: string } };
       if (!resp.ok) throw new Error(data.error?.message ?? 'Generation failed');
-      setCoverLetterContent(data.content ?? '');
-      setDocumentId(data.documentId ?? null);
+      setCoverContent(data.content ?? '');
+      setCoverDocId(data.documentId ?? null);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Generation failed');
+      setCoverError(err instanceof Error ? err.message : 'Generation failed');
     } finally {
-      setGenerating(false);
+      setCoverGenerating(false);
     }
   };
 
-  const handleExport = async (format: 'DOCX') => {
-    if (!documentId) return;
-    const { data } = await api.get(`/exports/document/${documentId}/${format}`);
+  const handleLoanGenerate = async () => {
+    if (!loanAmount || !loanPurpose) {
+      setLoanError('Please fill in loan amount and purpose.');
+      return;
+    }
+    setLoanError(''); setLoanGenerating(true); setLoanContent(''); setLoanDocId(null);
+    try {
+      const token = useAuthStore.getState().accessToken ?? '';
+      const resp = await fetch(`${getApiBase()}/documents/bank-loan/generate`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ profileId, bankName, loanAmount: parseFloat(loanAmount), purpose: loanPurpose, tenureMonths: parseInt(loanTenure) }),
+      });
+      const data = await resp.json() as { content?: string; documentId?: string; error?: { message?: string } };
+      if (!resp.ok) throw new Error(data.error?.message ?? 'Generation failed');
+      setLoanContent(data.content ?? '');
+      setLoanDocId(data.documentId ?? null);
+    } catch (err) {
+      setLoanError(err instanceof Error ? err.message : 'Generation failed');
+    } finally {
+      setLoanGenerating(false);
+    }
+  };
+
+  const handleExport = async (docId: string) => {
+    const { data } = await api.get(`/exports/document/${docId}/DOCX`);
     window.open((data as { url: string }).url, '_blank');
   };
 
+  const allItems = [
+    ...BASE_CHECKLIST,
+    ...(BANK_EXTRA[checklistBank] ?? []),
+  ];
+  const doneCount = allItems.filter(i => checked.has(i.id)).length;
+
+  const tabs: { id: TabId; label: string; icon: React.ReactNode }[] = [
+    { id: 'cover', label: 'Cover Letter', icon: <FileText size={16} /> },
+    { id: 'loan', label: 'Bank Loan Writer', icon: <Building2 size={16} /> },
+    { id: 'checklist', label: 'Document Checklist', icon: <CheckSquare size={16} /> },
+  ];
+
   return (
     <div className="max-w-4xl mx-auto">
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h1 className="font-montserrat font-bold text-2xl text-navy">Loan Application Toolkit</h1>
-          <p className="text-steel-grey text-sm mt-1">{profile?.name}</p>
-        </div>
-        {coverLetterContent && documentId && (
-          <button onClick={() => handleExport('DOCX')}
-            className="flex items-center gap-2 bg-navy text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-navy/90">
-            <Download size={15} /> Export DOCX
-          </button>
-        )}
+      <div className="mb-6">
+        <h1 className="font-montserrat font-bold text-2xl text-navy">Loan Application Toolkit</h1>
+        <p className="text-steel-grey text-sm mt-1">{profile?.name}</p>
       </div>
 
-      {!profile?.isComplete && (
-        <div className="bg-amber/10 border border-amber/30 rounded-xl p-4 mb-6 text-sm text-amber font-medium">
-          Complete your business profile before generating application documents.
+      <div className="flex border-b border-gray-200 mb-6">
+        {tabs.map(t => (
+          <button key={t.id} onClick={() => setTab(t.id)}
+            className={`flex items-center gap-2 px-6 py-3 text-sm font-semibold border-b-2 transition-colors ${tab === t.id ? 'border-amber text-navy' : 'border-transparent text-steel-grey hover:text-navy'}`}>
+            {t.icon}{t.label}
+          </button>
+        ))}
+      </div>
+
+      {/* ── Cover Letter ─────────────────────────────────────────── */}
+      {tab === 'cover' && (
+        <div className="space-y-6">
+          <div className="bg-white rounded-xl p-6 border border-gray-100 space-y-4">
+            <h2 className="font-montserrat font-bold text-navy">Cover Letter Generator</h2>
+            <div className="grid sm:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-dark-grey mb-1">Funder / Institution</label>
+                <select value={funderName} onChange={e => setFunderName(e.target.value)}
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-navy">
+                  <option value="">Select funder…</option>
+                  {FUNDERS.map(f => <option key={f} value={f}>{f}</option>)}
+                </select>
+              </div>
+              {funderName === 'Other' && (
+                <div>
+                  <label className="block text-sm font-medium text-dark-grey mb-1">Custom Funder Name</label>
+                  <input value={customFunder} onChange={e => setCustomFunder(e.target.value)}
+                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-navy" placeholder="Enter institution name" />
+                </div>
+              )}
+              <div>
+                <label className="block text-sm font-medium text-dark-grey mb-1">Funding Amount (USD)</label>
+                <input type="number" value={coverAmount} onChange={e => setCoverAmount(e.target.value)}
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-navy" placeholder="e.g. 50000" />
+              </div>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-dark-grey mb-1">Purpose of Funding</label>
+              <textarea rows={3} value={coverPurpose} onChange={e => setCoverPurpose(e.target.value)}
+                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-navy resize-none"
+                placeholder="Describe how you will use the funds — e.g. equipment purchase, working capital, expansion…" />
+            </div>
+            {coverError && <p className="text-red-600 text-sm">{coverError}</p>}
+            <div className="flex gap-3">
+              <button onClick={handleCoverGenerate} disabled={coverGenerating || !profile?.isComplete}
+                className="flex items-center gap-2 bg-amber text-navy px-5 py-2.5 rounded-lg text-sm font-bold hover:bg-amber/90 disabled:opacity-50">
+                <RefreshCw size={15} className={coverGenerating ? 'animate-spin' : ''} />
+                {coverGenerating ? 'Generating…' : 'Generate Cover Letter'}
+              </button>
+              {coverDocId && (
+                <button onClick={() => handleExport(coverDocId)}
+                  className="flex items-center gap-2 bg-navy text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-navy/90">
+                  <Download size={15} /> Export DOCX
+                </button>
+              )}
+            </div>
+            {!profile?.isComplete && (
+              <p className="text-xs text-steel-grey">Complete your business profile in Onboarding first.</p>
+            )}
+          </div>
+          {coverContent && (
+            <div className="bg-white rounded-xl p-6 border border-gray-100">
+              <h3 className="font-montserrat font-bold text-navy mb-4">Generated Cover Letter</h3>
+              <div className="text-sm text-dark-grey leading-relaxed whitespace-pre-wrap font-opensans border border-gray-100 rounded-lg p-4 bg-gray-50 max-h-[60vh] overflow-y-auto">
+                {coverContent}
+              </div>
+            </div>
+          )}
         </div>
       )}
 
-      <div className="grid md:grid-cols-2 gap-6">
-        <div className="bg-white rounded-xl border border-gray-100 p-6 space-y-4">
-          <h2 className="font-montserrat font-bold text-navy">Cover Letter Details</h2>
-
-          <div>
-            <label className="block text-sm font-medium text-dark-grey mb-1">Funder / Institution</label>
-            <select value={funderName} onChange={e => setFunderName(e.target.value)}
-              className="w-full border border-gray-200 rounded-lg px-4 py-3 text-sm focus:outline-none focus:border-navy">
-              <option value="">Select funder…</option>
-              {FUNDERS.map(f => <option key={f} value={f}>{f}</option>)}
-            </select>
-          </div>
-
-          {funderName === 'Other' && (
-            <div>
-              <label className="block text-sm font-medium text-dark-grey mb-1">Funder Name</label>
-              <input value={customFunder} onChange={e => setCustomFunder(e.target.value)} placeholder="Enter institution name"
-                className="w-full border border-gray-200 rounded-lg px-4 py-3 text-sm focus:outline-none focus:border-navy" />
-            </div>
-          )}
-
-          <div>
-            <label className="block text-sm font-medium text-dark-grey mb-1">Amount Requested (USD)</label>
-            <input type="number" value={amount} onChange={e => setAmount(e.target.value)} placeholder="e.g. 50000"
-              className="w-full border border-gray-200 rounded-lg px-4 py-3 text-sm focus:outline-none focus:border-navy" />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-dark-grey mb-1">Purpose of Funds</label>
-            <textarea rows={4} value={purpose} onChange={e => setPurpose(e.target.value)}
-              placeholder="Describe specifically what you will use the funds for…"
-              className="w-full border border-gray-200 rounded-lg px-4 py-3 text-sm focus:outline-none focus:border-navy resize-none" />
-          </div>
-
-          {error && <p className="text-error text-sm">{error}</p>}
-
-          <button onClick={handleGenerate} disabled={generating || !profile?.isComplete}
-            className="w-full flex items-center justify-center gap-2 bg-amber text-navy py-3 rounded-lg font-montserrat font-bold text-sm hover:bg-amber/90 disabled:opacity-50 transition-colors">
-            <RefreshCw size={16} className={generating ? 'animate-spin' : ''} />
-            {generating ? 'Generating…' : 'Generate Cover Letter'}
-          </button>
-        </div>
-
-        <div className="bg-white rounded-xl border border-gray-100 p-6">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="font-montserrat font-bold text-navy">Preview</h2>
-            {coverLetterContent && (
-              <div className="flex items-center gap-1 text-xs text-success font-medium">
-                <FileText size={12} /> Ready to export
+      {/* ── Bank Loan Writer ──────────────────────────────────────── */}
+      {tab === 'loan' && (
+        <div className="space-y-6">
+          <div className="bg-white rounded-xl p-6 border border-gray-100 space-y-4">
+            <h2 className="font-montserrat font-bold text-navy">Bank Loan Application Writer</h2>
+            <p className="text-steel-grey text-sm">Generates a full bank-formatted loan application narrative (750–1,000 words) tailored to the specific lender's requirements.</p>
+            <div className="grid sm:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-dark-grey mb-1">Target Bank</label>
+                <select value={bankName} onChange={e => setBankName(e.target.value)}
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-navy">
+                  {UGANDAN_BANKS.map(b => <option key={b} value={b}>{b}</option>)}
+                </select>
               </div>
+              <div>
+                <label className="block text-sm font-medium text-dark-grey mb-1">Loan Amount (USD)</label>
+                <input type="number" value={loanAmount} onChange={e => setLoanAmount(e.target.value)}
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-navy" placeholder="e.g. 100000" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-dark-grey mb-1">Repayment Tenure (months)</label>
+                <select value={loanTenure} onChange={e => setLoanTenure(e.target.value)}
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-navy">
+                  {[12, 24, 36, 48, 60, 72, 84, 120].map(m => <option key={m} value={m}>{m} months ({(m/12).toFixed(1)} years)</option>)}
+                </select>
+              </div>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-dark-grey mb-1">Loan Purpose</label>
+              <textarea rows={3} value={loanPurpose} onChange={e => setLoanPurpose(e.target.value)}
+                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-navy resize-none"
+                placeholder="Describe exactly how the loan will be used — specific assets, working capital, expansion plans…" />
+            </div>
+            {loanError && <p className="text-red-600 text-sm">{loanError}</p>}
+            <div className="flex gap-3">
+              <button onClick={handleLoanGenerate} disabled={loanGenerating || !profile?.isComplete}
+                className="flex items-center gap-2 bg-amber text-navy px-5 py-2.5 rounded-lg text-sm font-bold hover:bg-amber/90 disabled:opacity-50">
+                <RefreshCw size={15} className={loanGenerating ? 'animate-spin' : ''} />
+                {loanGenerating ? 'Writing Application…' : 'Generate Loan Application'}
+              </button>
+              {loanDocId && (
+                <button onClick={() => handleExport(loanDocId)}
+                  className="flex items-center gap-2 bg-navy text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-navy/90">
+                  <Download size={15} /> Export DOCX
+                </button>
+              )}
+            </div>
+            {!profile?.isComplete && (
+              <p className="text-xs text-steel-grey">Complete your business profile in Onboarding first.</p>
             )}
           </div>
-
-          {coverLetterContent ? (
-            <div className="text-sm text-dark-grey leading-relaxed whitespace-pre-wrap max-h-96 overflow-y-auto">
-              {coverLetterContent}
-            </div>
-          ) : (
-            <div className="flex flex-col items-center justify-center h-64 text-center">
-              <FileText size={36} className="text-navy/15 mb-3" />
-              <p className="text-steel-grey text-sm">Fill in the details and click Generate to create your cover letter.</p>
-              <p className="text-steel-grey/60 text-xs mt-2">Calibrated for East African banks and development finance institutions.</p>
+          {loanContent && (
+            <div className="bg-white rounded-xl p-6 border border-gray-100">
+              <h3 className="font-montserrat font-bold text-navy mb-4">Loan Application — {bankName}</h3>
+              <div className="text-sm text-dark-grey leading-relaxed whitespace-pre-wrap font-opensans border border-gray-100 rounded-lg p-4 bg-gray-50 max-h-[60vh] overflow-y-auto">
+                {loanContent}
+              </div>
             </div>
           )}
         </div>
-      </div>
+      )}
 
-      <div className="mt-8 grid md:grid-cols-3 gap-4">
-        {[
-          { title: 'What to include', items: ['Business registration certificate', 'Audited financial statements', 'Business plan (generated above)', 'Collateral documentation', 'Management CVs'] },
-          { title: 'Tips for banks', items: ['Show 2+ years of cash flow projections', 'Highlight collateral clearly', 'Demonstrate repayment capacity', 'Include personal guarantee terms', 'Reference existing banking relationship'] },
-          { title: 'Tips for grants', items: ['Emphasise social/economic impact', 'Quantify beneficiaries clearly', 'Show matching funds if available', 'Align with funder\'s stated priorities', 'Include monitoring & evaluation plan'] },
-        ].map(({ title, items }) => (
-          <div key={title} className="bg-light-grey rounded-xl p-5">
-            <h3 className="font-montserrat font-bold text-navy text-sm mb-3">{title}</h3>
-            <ul className="space-y-1.5">
-              {items.map(item => (
-                <li key={item} className="text-xs text-dark-grey flex items-start gap-2">
-                  <span className="text-amber mt-0.5">•</span> {item}
-                </li>
+      {/* ── Document Checklist ───────────────────────────────────── */}
+      {tab === 'checklist' && (
+        <div className="space-y-6">
+          <div className="bg-white rounded-xl p-6 border border-gray-100">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="font-montserrat font-bold text-navy">Document Checklist</h2>
+              <span className="text-sm font-semibold text-amber">{doneCount} / {allItems.length} ready</span>
+            </div>
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-dark-grey mb-1">Customise for bank</label>
+              <select value={checklistBank} onChange={e => setChecklistBank(e.target.value)}
+                className="border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-navy">
+                {UGANDAN_BANKS.map(b => <option key={b} value={b}>{b}</option>)}
+              </select>
+            </div>
+            <div className="h-2 bg-gray-100 rounded-full mb-6">
+              <div className="h-2 bg-amber rounded-full transition-all" style={{ width: `${(doneCount / allItems.length) * 100}%` }} />
+            </div>
+            <div className="space-y-3">
+              <p className="text-xs font-semibold text-steel-grey uppercase tracking-wider">Standard Requirements</p>
+              {BASE_CHECKLIST.map(item => (
+                <button key={item.id} onClick={() => toggleCheck(item.id)}
+                  className="w-full flex items-center gap-3 p-3 rounded-lg border border-gray-100 hover:border-amber/30 hover:bg-amber/5 transition-colors text-left">
+                  {checked.has(item.id)
+                    ? <CheckSquare size={18} className="text-amber shrink-0" />
+                    : <Square size={18} className="text-gray-300 shrink-0" />}
+                  <span className={`text-sm ${checked.has(item.id) ? 'text-steel-grey line-through' : 'text-dark-grey'}`}>{item.label}</span>
+                </button>
               ))}
-            </ul>
+              {(BANK_EXTRA[checklistBank] ?? []).length > 0 && (
+                <>
+                  <p className="text-xs font-semibold text-steel-grey uppercase tracking-wider pt-2">{checklistBank} — Additional Requirements</p>
+                  {(BANK_EXTRA[checklistBank] ?? []).map(item => (
+                    <button key={item.id} onClick={() => toggleCheck(item.id)}
+                      className="w-full flex items-center gap-3 p-3 rounded-lg border border-amber/20 bg-amber/5 hover:bg-amber/10 transition-colors text-left">
+                      {checked.has(item.id)
+                        ? <CheckSquare size={18} className="text-amber shrink-0" />
+                        : <Square size={18} className="text-amber/40 shrink-0" />}
+                      <span className={`text-sm ${checked.has(item.id) ? 'text-steel-grey line-through' : 'text-dark-grey'}`}>{item.label}</span>
+                    </button>
+                  ))}
+                </>
+              )}
+            </div>
           </div>
-        ))}
-      </div>
+          <div className="bg-navy/5 rounded-xl p-4 text-xs text-steel-grey leading-relaxed">
+            <strong className="text-navy">Tip:</strong> Your progress is saved automatically in this browser. Generate your Business Plan and Financial Model first — both will be needed as supporting documents.
+          </div>
+        </div>
+      )}
     </div>
   );
 }

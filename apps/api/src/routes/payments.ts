@@ -80,15 +80,39 @@ router.post('/webhook', async (req, res, next) => {
             where: { id: session.metadata.workspaceId },
             data: { planTier, stripeSubscriptionId: sub.id, stripeCurrentPeriodEnd: new Date(sub.current_period_end * 1000) },
           });
+          // Sync planTier to user so planGuard (which reads req.user.planTier) enforces the new limits immediately
+          const members = await prisma.workspaceMember.findMany({
+            where: { workspaceId: session.metadata.workspaceId },
+            select: { userId: true },
+          });
+          if (members.length > 0) {
+            await prisma.user.updateMany({
+              where: { id: { in: members.map(m => m.userId) } },
+              data: { planTier },
+            });
+          }
         }
         break;
       }
       case 'customer.subscription.deleted': {
         const sub = event.data.object as Stripe.Subscription;
+        const ws = await prisma.workspace.findFirst({ where: { stripeSubscriptionId: sub.id } });
         await prisma.workspace.updateMany({
           where: { stripeSubscriptionId: sub.id },
           data: { planTier: 'FREE', stripeSubscriptionId: null },
         });
+        if (ws) {
+          const members = await prisma.workspaceMember.findMany({
+            where: { workspaceId: ws.id },
+            select: { userId: true },
+          });
+          if (members.length > 0) {
+            await prisma.user.updateMany({
+              where: { id: { in: members.map(m => m.userId) } },
+              data: { planTier: 'FREE' },
+            });
+          }
+        }
         break;
       }
       case 'invoice.payment_failed': {

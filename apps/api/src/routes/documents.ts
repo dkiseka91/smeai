@@ -5,7 +5,7 @@ import { prisma } from '../lib/prisma';
 import { authMiddleware } from '../middleware/auth';
 import { aiRateLimiter } from '../middleware/rateLimiter';
 import { planGuard } from '../middleware/planGuard';
-import { generateFullBusinessPlan, generatePitchDeck, reviewPitchDeck, generateCoverLetter } from '@sme-pitch-ai/ai';
+import { generateFullBusinessPlan, generatePitchDeck, reviewPitchDeck, generateCoverLetter, generateBankLoanApplication } from '@sme-pitch-ai/ai';
 import { OnboardingDataSchema } from '@sme-pitch-ai/shared';
 import type { AudienceType, PitchFramework } from '@sme-pitch-ai/shared';
 
@@ -176,6 +176,35 @@ router.post('/cover-letter/generate', aiRateLimiter, async (req, res, next) => {
 
     const document = await prisma.document.create({
       data: { profileId, type: 'COVER_LETTER', status: 'COMPLETE', audience: 'BANK', content: toJson({ text: content }) },
+    });
+
+    res.json({ content, documentId: document.id });
+  } catch (err) { next(err); }
+});
+
+router.post('/bank-loan/generate', aiRateLimiter, async (req, res, next) => {
+  try {
+    const { profileId, bankName, loanAmount, purpose, tenureMonths } = z.object({
+      profileId: z.string(),
+      bankName: z.string().min(1),
+      loanAmount: z.number().positive(),
+      purpose: z.string().min(10),
+      tenureMonths: z.number().int().min(1).max(120),
+    }).parse(req.body);
+
+    const profile = await prisma.businessProfile.findFirst({
+      where: { id: profileId, workspaceId: req.workspaceId!, deletedAt: null },
+    });
+    if (!profile || !profile.isComplete) {
+      res.status(400).json({ error: { code: 'PROFILE_INCOMPLETE', message: 'Profile must be complete' } });
+      return;
+    }
+
+    const onboardingData = OnboardingDataSchema.parse(profile.onboardingData);
+    const content = await generateBankLoanApplication(onboardingData, bankName, loanAmount, purpose, tenureMonths);
+
+    const document = await prisma.document.create({
+      data: { profileId, type: 'COVER_LETTER', status: 'COMPLETE', audience: 'BANK', content: toJson({ text: content, bankName, loanAmount }) },
     });
 
     res.json({ content, documentId: document.id });
