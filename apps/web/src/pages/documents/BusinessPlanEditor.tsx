@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { api } from '../../lib/api';
+import { api, getApiBase } from '../../lib/api';
+import { useAuthStore } from '../../stores/authStore';
 import { Download, RefreshCw } from 'lucide-react';
 
 const SECTIONS = [
@@ -17,7 +18,7 @@ const SECTIONS = [
   { id: 'appendix',             title: 'Appendix' },
 ];
 
-const AUDIENCES = ['BANK', 'INVESTOR', 'GRANT', 'ACCELERATOR'] as const;
+const AUDIENCES = ['BANK', 'INVESTOR', 'GRANT', 'ACCELERATOR', 'COMPETITION', 'GENERAL'] as const;
 
 export default function BusinessPlanEditor() {
   const { profileId } = useParams();
@@ -39,9 +40,9 @@ export default function BusinessPlanEditor() {
     setIsGenerating(true);
     setSections({});
     setProgress(0);
-    const resp = await fetch('/api/documents/plan/generate', {
+    const resp = await fetch(`${getApiBase()}/documents/plan/generate`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${localStorage.getItem('accessToken') ?? ''}` },
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${useAuthStore.getState().accessToken ?? ''}` },
       body: JSON.stringify({ profileId, audience }),
     });
     if (!resp.body) return;

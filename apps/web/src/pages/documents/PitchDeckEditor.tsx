@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '../../lib/api';
-import { Download, RefreshCw, Plus, Trash2 } from 'lucide-react';
+import { Download, RefreshCw, Plus, Trash2, Save } from 'lucide-react';
 
 const FRAMEWORKS = ['INVESTOR', 'BANK', 'GRANT', 'ACCELERATOR', 'COMPETITION', 'GENERAL'] as const;
 
@@ -15,6 +15,7 @@ export default function PitchDeckEditor() {
   const [deck, setDeck] = useState<DeckContent | null>(null);
   const [activeSlide, setActiveSlide] = useState(0);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
   const [documentId, setDocumentId] = useState<string | null>(null);
 
   const { data: profile } = useQuery({
@@ -32,6 +33,16 @@ export default function PitchDeckEditor() {
       setActiveSlide(0);
     } finally {
       setIsGenerating(false);
+    }
+  };
+
+  const saveDeck = async () => {
+    if (!documentId || !deck) return;
+    setIsSaving(true);
+    try {
+      await api.put(`/documents/${documentId}`, { content: deck });
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -60,6 +71,13 @@ export default function PitchDeckEditor() {
             <RefreshCw size={16} className={isGenerating ? 'animate-spin' : ''} />
             {isGenerating ? 'Generating…' : 'Generate Deck'}
           </button>
+          {documentId && (
+            <button onClick={saveDeck} disabled={isSaving}
+              className="flex items-center gap-1.5 bg-white border border-gray-200 text-navy px-4 py-2 rounded-lg text-sm font-medium hover:bg-gray-50 disabled:opacity-50">
+              <Save size={16} className={isSaving ? 'animate-spin' : ''} />
+              {isSaving ? 'Saving…' : 'Save'}
+            </button>
+          )}
           {documentId && (
             <button onClick={exportDeck} className="flex items-center gap-1.5 bg-navy text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-navy/90">
               <Download size={16} /> PPTX

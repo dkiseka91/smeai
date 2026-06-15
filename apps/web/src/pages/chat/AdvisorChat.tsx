@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { api } from '../../lib/api';
+import { api, getApiBase } from '../../lib/api';
 import { useAuthStore } from '../../stores/authStore';
 import { Send } from 'lucide-react';
 import { PLAN_LIMITS } from '@sme-pitch-ai/shared';
@@ -53,9 +53,9 @@ export default function AdvisorChat() {
     setStreaming(true);
     setMessages(m => [...m, { role: 'assistant', content: '' }]);
 
-    const resp = await fetch('/api/chat/message', {
+    const resp = await fetch(`${getApiBase()}/chat/message`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${localStorage.getItem('accessToken') ?? ''}` },
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${useAuthStore.getState().accessToken ?? ''}` },
       body: JSON.stringify({ profileId, message: text }),
     });
 
