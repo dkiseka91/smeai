@@ -1,5 +1,6 @@
 {
   "version": 2,
+  "framework": null,
   "installCommand": "pnpm install --no-frozen-lockfile",
   "buildCommand": "pnpm --filter db exec prisma generate && node_modules/.bin/esbuild api/index.ts --bundle --platform=node --target=node18 --outfile=api/handler.js --external:@prisma/client --external:prisma",
   "outputDirectory": "public",
