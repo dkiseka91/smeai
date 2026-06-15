@@ -1,7 +1,31 @@
-import React, { lazy, Suspense } from 'react';
+import React, { lazy, Suspense, Component, type ReactNode, type ErrorInfo } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { useAuthStore } from './stores/authStore';
 import AppLayout from './components/layout/AppLayout';
+
+class ErrorBoundary extends Component<{ children: ReactNode }, { error: Error | null }> {
+  constructor(props: { children: ReactNode }) {
+    super(props);
+    this.state = { error: null };
+  }
+  static getDerivedStateFromError(error: Error) { return { error }; }
+  componentDidCatch(error: Error, info: ErrorInfo) { console.error('[ErrorBoundary]', error, info); }
+  render() {
+    if (this.state.error) return (
+      <div className="min-h-screen bg-light-grey flex items-center justify-center px-4">
+        <div className="bg-white rounded-2xl shadow-xl p-8 max-w-md w-full text-center">
+          <h1 className="font-montserrat font-bold text-2xl text-navy mb-2">Something went wrong</h1>
+          <p className="text-steel-grey text-sm mb-6">{this.state.error.message}</p>
+          <button onClick={() => { this.setState({ error: null }); window.location.href = '/dashboard'; }}
+            className="bg-navy text-white px-6 py-2 rounded-lg text-sm font-semibold hover:bg-navy/90">
+            Return to Dashboard
+          </button>
+        </div>
+      </div>
+    );
+    return this.props.children;
+  }
+}
 
 const Landing = lazy(() => import('./pages/Landing'));
 const Login = lazy(() => import('./pages/auth/Login'));
@@ -27,6 +51,7 @@ function PrivateRoute({ children }: { children: React.ReactNode }) {
 
 export default function App() {
   return (
+    <ErrorBoundary>
     <BrowserRouter>
       <Suspense fallback={<div className="flex items-center justify-center h-screen"><div className="animate-spin rounded-full h-12 w-12 border-b-2 border-navy" /></div>}>
         <Routes>
@@ -52,5 +77,6 @@ export default function App() {
         </Routes>
       </Suspense>
     </BrowserRouter>
+    </ErrorBoundary>
   );
 }

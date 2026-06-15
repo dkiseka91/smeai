@@ -69,8 +69,8 @@ router.post('/plan/:id/regenerate-section', aiRateLimiter, async (req, res, next
       audience: z.enum(['BANK', 'INVESTOR', 'GRANT', 'ACCELERATOR', 'COMPETITION', 'GENERAL']),
     }).parse(req.body);
 
-    const document = await prisma.document.findUnique({
-      where: { id: paramId(req, 'id') },
+    const document = await prisma.document.findFirst({
+      where: { id: paramId(req, 'id'), profile: { workspaceId: req.workspaceId! } },
       include: { profile: true },
     });
     if (!document) { res.status(404).json({ error: { code: 'NOT_FOUND', message: 'Document not found' } }); return; }
@@ -116,7 +116,7 @@ router.post('/deck/generate', aiRateLimiter, planGuard('monthlyDecks'), async (r
 
 router.post('/deck/:id/review', aiRateLimiter, async (req, res, next) => {
   try {
-    const document = await prisma.document.findUnique({ where: { id: paramId(req, 'id') } });
+    const document = await prisma.document.findFirst({ where: { id: paramId(req, 'id'), profile: { workspaceId: req.workspaceId! } } });
     if (!document) { res.status(404).json({ error: { code: 'NOT_FOUND', message: 'Document not found' } }); return; }
     const { PitchDeckContentSchema } = await import('@sme-pitch-ai/shared');
     const deckContent = PitchDeckContentSchema.parse(document.content);
@@ -128,7 +128,7 @@ router.post('/deck/:id/review', aiRateLimiter, async (req, res, next) => {
 router.get('/:id', async (req, res, next) => {
   try {
     const document = await prisma.document.findFirst({
-      where: { id: paramId(req, 'id'), deletedAt: null },
+      where: { id: paramId(req, 'id'), deletedAt: null, profile: { workspaceId: req.workspaceId! } },
       include: { exports: true },
     });
     if (!document) { res.status(404).json({ error: { code: 'NOT_FOUND', message: 'Document not found' } }); return; }
@@ -139,6 +139,10 @@ router.get('/:id', async (req, res, next) => {
 router.put('/:id', async (req, res, next) => {
   try {
     const { content } = z.object({ content: z.record(z.unknown()) }).parse(req.body);
+    const existing = await prisma.document.findFirst({
+      where: { id: paramId(req, 'id'), profile: { workspaceId: req.workspaceId! } },
+    });
+    if (!existing) { res.status(404).json({ error: { code: 'NOT_FOUND', message: 'Document not found' } }); return; }
     const document = await prisma.document.update({
       where: { id: paramId(req, 'id') },
       data: { content: toJson(content) },
@@ -149,6 +153,10 @@ router.put('/:id', async (req, res, next) => {
 
 router.delete('/:id', async (req, res, next) => {
   try {
+    const existing = await prisma.document.findFirst({
+      where: { id: paramId(req, 'id'), profile: { workspaceId: req.workspaceId! } },
+    });
+    if (!existing) { res.status(404).json({ error: { code: 'NOT_FOUND', message: 'Document not found' } }); return; }
     await prisma.document.update({ where: { id: paramId(req, 'id') }, data: { deletedAt: new Date() } });
     res.json({ message: 'Document deleted' });
   } catch (err) { next(err); }

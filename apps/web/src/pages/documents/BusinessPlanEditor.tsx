@@ -18,7 +18,7 @@ const SECTIONS = [
   { id: 'appendix',             title: 'Appendix' },
 ];
 
-const AUDIENCES = ['BANK', 'INVESTOR', 'GRANT', 'ACCELERATOR'] as const;
+const AUDIENCES = ['BANK', 'INVESTOR', 'GRANT', 'ACCELERATOR', 'COMPETITION', 'GENERAL'] as const;
 
 export default function BusinessPlanEditor() {
   const { profileId } = useParams();
