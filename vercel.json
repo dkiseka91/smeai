@@ -1,14 +1,12 @@
 {
   "version": 2,
   "installCommand": "pnpm install --no-frozen-lockfile",
-  "buildCommand": "pnpm --filter db exec prisma generate",
+  "buildCommand": "pnpm --filter db exec prisma generate && node_modules/.bin/esbuild api/index.ts --bundle --platform=node --target=node18 --outfile=api/handler.js --external:@prisma/client --external:prisma",
   "outputDirectory": "public",
   "functions": {
-    "api/index.ts": {
-      "maxDuration": 60
-    }
+    "api/handler.js": { "maxDuration": 60 }
   },
   "rewrites": [
-    { "source": "/(.*)", "destination": "/api/index" }
+    { "source": "/(.*)", "destination": "/api/handler" }
   ]
 }
