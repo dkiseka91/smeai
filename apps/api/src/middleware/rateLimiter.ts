@@ -6,7 +6,10 @@ async function checkRateLimit(
   limit: number,
   windowSeconds: number
 ): Promise<{ allowed: boolean; remaining: number }> {
-  if (!redis) return { allowed: true, remaining: limit };
+  if (!redis) {
+    console.warn('[RateLimiter] Redis unavailable — applying conservative limit');
+    return { allowed: true, remaining: 1 };
+  }
   const now = Date.now();
   const windowStart = now - windowSeconds * 1000;
   const pipeline = redis.pipeline();
