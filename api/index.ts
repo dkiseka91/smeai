@@ -1,4 +1,3 @@
 // Vercel serverless function entry point
-// Uses relative imports to avoid pnpm workspace symlink resolution issues
-import 'dotenv/config';
+// Env vars are provided by Vercel dashboard — no dotenv needed
 export { default } from '../apps/api/src/app';
