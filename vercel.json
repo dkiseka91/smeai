@@ -2,12 +2,5 @@
   "version": 2,
   "framework": null,
   "installCommand": "pnpm install --no-frozen-lockfile",
-  "buildCommand": "pnpm --filter db exec prisma generate && node_modules/.bin/esbuild api/index.ts --bundle --platform=node --target=node18 --outfile=api/handler.js --external:@prisma/client --external:prisma",
-  "outputDirectory": "public",
-  "functions": {
-    "api/handler.js": { "maxDuration": 60 }
-  },
-  "rewrites": [
-    { "source": "/(.*)", "destination": "/api/handler" }
-  ]
+  "buildCommand": "node scripts/vercel-build.mjs"
 }
