@@ -84,8 +84,13 @@ router.put('/:id', async (req, res, next) => {
     if (body.onboardingData !== undefined) updateData.onboardingData = toJson(body.onboardingData);
     if (isComplete !== undefined) updateData.isComplete = isComplete;
 
+    const existing = await prisma.businessProfile.findFirst({
+      where: { id: req.params['id'] as string, workspaceId: req.workspaceId!, deletedAt: null },
+    });
+    if (!existing) { res.status(404).json({ error: { code: 'NOT_FOUND', message: 'Profile not found' } }); return; }
+
     const profile = await prisma.businessProfile.update({
-      where: { id: req.params['id'] as string },
+      where: { id: existing.id },
       data: updateData,
     });
     res.json(profile);
@@ -94,8 +99,12 @@ router.put('/:id', async (req, res, next) => {
 
 router.delete('/:id', async (req, res, next) => {
   try {
+    const existing = await prisma.businessProfile.findFirst({
+      where: { id: req.params['id'] as string, workspaceId: req.workspaceId!, deletedAt: null },
+    });
+    if (!existing) { res.status(404).json({ error: { code: 'NOT_FOUND', message: 'Profile not found' } }); return; }
     await prisma.businessProfile.update({
-      where: { id: req.params['id'] as string },
+      where: { id: existing.id },
       data: { deletedAt: new Date() },
     });
     res.json({ message: 'Profile deleted' });

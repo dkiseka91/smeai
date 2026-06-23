@@ -4,6 +4,7 @@ import { z } from 'zod';
 import { prisma } from '../lib/prisma';
 import { authMiddleware } from '../middleware/auth';
 import { planGuard } from '../middleware/planGuard';
+import { aiRateLimiter } from '../middleware/rateLimiter';
 import { streamChatResponse } from '@sme-pitch-ai/ai';
 import { OnboardingDataSchema } from '@sme-pitch-ai/shared';
 import type { ChatMessage } from '@sme-pitch-ai/shared';
@@ -11,7 +12,7 @@ import type { ChatMessage } from '@sme-pitch-ai/shared';
 const router = Router();
 router.use(authMiddleware);
 
-router.post('/message', planGuard('chatQueries'), async (req, res, next) => {
+router.post('/message', aiRateLimiter, planGuard('chatQueries'), async (req, res, next) => {
   try {
     const { profileId, message } = z.object({ profileId: z.string(), message: z.string() }).parse(req.body);
 
@@ -53,7 +54,11 @@ router.post('/message', planGuard('chatQueries'), async (req, res, next) => {
 
 router.get('/:profileId/history', async (req, res, next) => {
   try {
-    const session = await prisma.chatSession.findFirst({ where: { profileId: req.params.profileId } });
+    const profile = await prisma.businessProfile.findFirst({
+      where: { id: req.params.profileId as string, workspaceId: req.workspaceId!, deletedAt: null },
+    });
+    if (!profile) { res.status(404).json({ error: { code: 'NOT_FOUND', message: 'Profile not found' } }); return; }
+    const session = await prisma.chatSession.findFirst({ where: { profileId: profile.id } });
     res.json(session?.messages ?? []);
   } catch (err) { next(err); }
 });

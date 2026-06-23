@@ -15,7 +15,7 @@ import exportsRouter from './routes/exports';
 const app = express();
 
 app.use(helmet());
-app.use(cors({ origin: process.env.FRONTEND_URL, credentials: true }));
+app.use(cors({ origin: process.env.FRONTEND_URL || false, credentials: true }));
 app.use(morgan('dev'));
 app.use('/api/payments/webhook', express.raw({ type: 'application/json' }));
 app.use(express.json());

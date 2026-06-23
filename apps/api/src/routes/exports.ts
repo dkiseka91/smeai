@@ -15,7 +15,7 @@ router.get('/document/:id/:format', async (req, res, next) => {
   try {
     const format = z.enum(['DOCX', 'PDF', 'PPTX']).parse(req.params.format.toUpperCase());
     const document = await prisma.document.findFirst({
-      where: { id: req.params.id, deletedAt: null },
+      where: { id: req.params.id, deletedAt: null, profile: { workspaceId: req.workspaceId! } },
       include: { profile: { include: { workspace: true } } },
     });
     if (!document) { res.status(404).json({ error: { code: 'NOT_FOUND', message: 'Document not found' } }); return; }
@@ -48,7 +48,9 @@ router.get('/document/:id/:format', async (req, res, next) => {
 
 router.get('/financial/:id', async (req, res, next) => {
   try {
-    const model = await prisma.financialModel.findUnique({ where: { id: req.params.id } });
+    const model = await prisma.financialModel.findFirst({
+      where: { id: req.params.id, profile: { workspaceId: req.workspaceId! } },
+    });
     if (!model) { res.status(404).json({ error: { code: 'NOT_FOUND', message: 'Financial model not found' } }); return; }
 
     const inputs = FinancialModelInputsSchema.parse(model.revenueInputs);

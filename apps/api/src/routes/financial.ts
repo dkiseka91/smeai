@@ -21,13 +21,20 @@ router.post('/calculate', async (req, res, next) => {
 
 router.post('/:id/save', async (req, res, next) => {
   try {
-    const { inputs, outputs } = req.body as { inputs: unknown; outputs: unknown };
+    const { inputs, outputs, profileId } = req.body as { inputs: unknown; outputs: unknown; profileId?: string };
+    const targetProfileId = profileId ?? (req.body as { profileId: string }).profileId;
+
+    const profile = await prisma.businessProfile.findFirst({
+      where: { id: targetProfileId, workspaceId: req.workspaceId!, deletedAt: null },
+    });
+    if (!profile) { res.status(404).json({ error: { code: 'NOT_FOUND', message: 'Profile not found' } }); return; }
+
     const model = await prisma.financialModel.upsert({
       where: { id: req.params['id'] as string },
       update: { revenueInputs: toJson(inputs), outputs: toJson(outputs) },
       create: {
         id: req.params['id'] as string,
-        profileId: (req.body as { profileId: string }).profileId,
+        profileId: profile.id,
         currency: (inputs as { currency?: string }).currency ?? 'USD',
         revenueInputs: toJson(inputs),
         costInputs: {},
@@ -40,8 +47,12 @@ router.post('/:id/save', async (req, res, next) => {
 
 router.get('/:profileId', async (req, res, next) => {
   try {
+    const profile = await prisma.businessProfile.findFirst({
+      where: { id: req.params['profileId'] as string, workspaceId: req.workspaceId!, deletedAt: null },
+    });
+    if (!profile) { res.status(404).json({ error: { code: 'NOT_FOUND', message: 'Profile not found' } }); return; }
     const model = await prisma.financialModel.findFirst({
-      where: { profileId: req.params['profileId'] as string },
+      where: { profileId: profile.id },
       orderBy: { createdAt: 'desc' },
     });
     if (!model) { res.status(404).json({ error: { code: 'NOT_FOUND', message: 'Financial model not found' } }); return; }

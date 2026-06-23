@@ -52,7 +52,7 @@ router.post('/register', authRateLimiter, async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-router.post('/verify-email', async (req, res, next) => {
+router.post('/verify-email', authRateLimiter, async (req, res, next) => {
   try {
     const { token } = z.object({ token: z.string() }).parse(req.query);
     const user = await prisma.user.findFirst({ where: { emailVerificationToken: token } });
@@ -133,7 +133,7 @@ router.post('/forgot-password', authRateLimiter, async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-router.post('/reset-password', async (req, res, next) => {
+router.post('/reset-password', authRateLimiter, async (req, res, next) => {
   try {
     const { token, password } = z.object({ token: z.string(), password: z.string().min(8) }).parse(req.body);
     const user = await prisma.user.findFirst({
