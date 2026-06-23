@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "concurrently \"pnpm --filter api dev\" \"pnpm --filter web dev\"",
     "build": "pnpm --filter api build && pnpm --filter web build",
+    "vercel-build": "pnpm --filter db exec prisma generate && node_modules/.bin/esbuild api/index.ts --bundle --platform=node --target=node18 --outfile=api/handler.js --external:@prisma/client --external:prisma",
     "db:migrate": "pnpm --filter db migrate",
     "db:seed": "pnpm --filter db seed",
     "test": "pnpm --filter api test && pnpm --filter web test",
