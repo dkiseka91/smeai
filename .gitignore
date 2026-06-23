@@ -26,3 +26,4 @@ ui-debug.log
 *.local
 tmp/
 api/handler.js
+.vercel
