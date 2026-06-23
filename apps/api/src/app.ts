@@ -4,6 +4,8 @@ import cors from 'cors';
 import cookieParser from 'cookie-parser';
 import morgan from 'morgan';
 import { errorHandler } from './middleware/errorHandler';
+import { prisma } from './lib/prisma';
+import { redis } from './lib/redis';
 import authRouter from './routes/auth';
 import profilesRouter from './routes/profiles';
 import documentsRouter from './routes/documents';
@@ -22,8 +24,6 @@ app.use(express.json());
 app.use(cookieParser());
 
 app.get('/api/health', async (_req, res) => {
-  const { prisma } = await import('./lib/prisma');
-  const { redis } = await import('./lib/redis');
   try {
     await prisma.$queryRaw`SELECT 1`;
     const redisStatus = redis ? await redis.ping().then(() => 'connected').catch(() => 'error') : 'disabled';

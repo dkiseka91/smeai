@@ -5,8 +5,8 @@ import { prisma } from '../lib/prisma';
 import { authMiddleware } from '../middleware/auth';
 import { aiRateLimiter } from '../middleware/rateLimiter';
 import { planGuard } from '../middleware/planGuard';
-import { generateFullBusinessPlan, generatePitchDeck, reviewPitchDeck, generateCoverLetter, generateBankLoanApplication } from '@sme-pitch-ai/ai';
-import { OnboardingDataSchema } from '@sme-pitch-ai/shared';
+import { generateFullBusinessPlan, generatePitchDeck, reviewPitchDeck, generateCoverLetter, generateBankLoanApplication, generateBusinessPlanSection } from '@sme-pitch-ai/ai';
+import { OnboardingDataSchema, PitchDeckContentSchema } from '@sme-pitch-ai/shared';
 import type { AudienceType, PitchFramework } from '@sme-pitch-ai/shared';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -76,7 +76,6 @@ router.post('/plan/:id/regenerate-section', aiRateLimiter, async (req, res, next
     if (!document) { res.status(404).json({ error: { code: 'NOT_FOUND', message: 'Document not found' } }); return; }
 
     const onboardingData = OnboardingDataSchema.parse(document.profile.onboardingData);
-    const { generateBusinessPlanSection } = await import('@sme-pitch-ai/ai');
     const content = await generateBusinessPlanSection(onboardingData, sectionId as Parameters<typeof generateBusinessPlanSection>[1], audience as AudienceType);
 
     const existingContent = document.content as unknown as Record<string, unknown> & { sections?: Array<{ id: string; content: string }> };
@@ -118,7 +117,6 @@ router.post('/deck/:id/review', aiRateLimiter, async (req, res, next) => {
   try {
     const document = await prisma.document.findFirst({ where: { id: paramId(req, 'id'), profile: { workspaceId: req.workspaceId! } } });
     if (!document) { res.status(404).json({ error: { code: 'NOT_FOUND', message: 'Document not found' } }); return; }
-    const { PitchDeckContentSchema } = await import('@sme-pitch-ai/shared');
     const deckContent = PitchDeckContentSchema.parse(document.content);
     const review = await reviewPitchDeck(deckContent);
     res.json(review);
