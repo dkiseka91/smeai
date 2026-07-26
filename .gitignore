@@ -27,3 +27,9 @@ ui-debug.log
 tmp/
 api/handler.js
 .vercel
+
+# VibeCheck local SQLite data
+apps/vibecheck/api/data/*.db
+apps/vibecheck/api/data/*.db-journal
+apps/vibecheck/api/data/*.db-shm
+apps/vibecheck/api/data/*.db-wal

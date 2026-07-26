@@ -9,7 +9,9 @@
     "db:migrate": "pnpm --filter db migrate",
     "db:seed": "pnpm --filter db seed",
     "test": "pnpm --filter api test && pnpm --filter web test",
-    "lint": "pnpm --recursive lint"
+    "lint": "pnpm --recursive lint",
+    "vibecheck:dev": "concurrently \"pnpm --filter @vibecheck/api dev\" \"pnpm --filter @vibecheck/web dev\"",
+    "vibecheck:build": "pnpm --filter @vibecheck/api build && pnpm --filter @vibecheck/web build"
   },
   "devDependencies": {
     "concurrently": "^8.2.2",

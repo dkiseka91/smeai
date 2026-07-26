@@ -196,6 +196,16 @@ Pay-per-document: $15 for a single clean export (no subscription required).
 
 ---
 
+## VibeCheck
+
+A standalone production-readiness auditor tool also lives in this monorepo at
+[`apps/vibecheck`](./apps/vibecheck) — paste a URL, get an automated
+security/performance/resiliency/infrastructure audit with a 0–100 score and
+copy-paste fixes. Run it with `pnpm vibecheck:dev`; see
+[`apps/vibecheck/README.md`](./apps/vibecheck/README.md) for details.
+
+---
+
 ## Support
 
 - Email: hello@aelevate.co.ug
